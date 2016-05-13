@@ -53,12 +53,14 @@ public class StarTravellerVis {
             int from = ufoParm[i*3+idx-1];
             int bdst = 1<<30;
             int bj = rnd.nextInt(NStar);
+
             // Pick [range] random stars and select the nearest one to travel to.
             for (int j = 0; j < ufoRange[i]; j++) {
                 int p = rnd.nextInt(NStar);
                 int dy = star[p].y - star[from].y;
                 int dx = star[p].x - star[from].x;
                 int dst = (dx*dx + dy*dy);
+
                 if (dst < bdst && dst > 0) {
                     bdst = dst;
                     bj = p;
@@ -97,23 +99,23 @@ public class StarTravellerVis {
         // Generate stars
         // Generate galaxy center positions
         Pnt[] galaxy = new Pnt[NG];
-        for (int i=0;i<NG;i++) {
+        for (int i = 0; i < NG; i++) {
             galaxy[i] = new Pnt(rnd.nextInt(SZ), rnd.nextInt(SZ));
         }
         // Generate star locations
-        for (int i=0;i<NStar;i++) {
+        for (int i = 0; i < NStar; i++) {
             // Pick a random gaussian location centered at a random galaxy
             int x = 0, y = 0;
             int g = rnd.nextInt(NG);
-            do
-            {
+
+            do {
                 x = (int)(rnd.nextGaussian()*100) + galaxy[g].x;
                 y = (int)(rnd.nextGaussian()*100) + galaxy[g].y;
-            } while (x<0 || y<0 || x>=SZ || y>=SZ);
+            } while (x < 0 || y < 0 || x >= SZ || y >= SZ);
             star[i] = new Pnt(x,y);
         }
         // Assign initial space ship locations
-        for (int i=0;i<NShip;i++) {
+        for (int i = 0; i < NShip; i++) {
             ship[i] = rnd.nextInt(NStar);
         }
         // Generate UFO
@@ -128,7 +130,7 @@ public class StarTravellerVis {
         calculateNextStar(2);
 
         // convert to parameter array
-        for (int i=0;i<NStar;i++) {
+        for (int i = 0; i < NStar; i++) {
             starParm[i*2] = star[i].x;
             starParm[i*2+1] = star[i].y;
         }
@@ -142,33 +144,26 @@ public class StarTravellerVis {
       }
     }
     // ---------------------------------------------------
-    public double runTest(String seed)
-    {
+    public double runTest(String seed) {
       try {
         generate(seed);
         double score = -1;
         int turns = 0;
-        if (proc != null)
-        {
+        if (proc != null) {
             int iret;
-            try
-            {
+            try {
                 iret  = init(starParm);
-            }
-            catch (Exception e)
-            {
+            } catch (Exception e) {
                 addFatalError("Failed to get result from init.");
                 return -1.0;
             }
 
-            if (vis)
-            {
+            if (vis) {
                 // draw the image
                 jf.setSize(SZX,SZY);
                 jf.setVisible(true);
                 draw();
-                if (startPaused)
-                {
+                if (startPaused) {
                     v.pauseMode = true;
                 }
                 v.processPause();
@@ -319,8 +314,7 @@ public class StarTravellerVis {
         return ret;
     }
     // ---------------------------------------------------
-    void signalEnd() throws IOException
-    {
+    void signalEnd() throws IOException {
         StringBuffer sb = new StringBuffer();
         sb.append("-1").append('\n');
         os.write(sb.toString().getBytes());
@@ -332,8 +326,7 @@ public class StarTravellerVis {
         v.repaint();
     }
     // ---------------------------------------------------
-    BufferedImage drawCase(boolean showUfo)
-    {
+    BufferedImage drawCase(boolean showUfo) {
         BufferedImage bi = new BufferedImage(SZX+10,SZY+10,BufferedImage.TYPE_INT_RGB);
         Graphics2D g2 = (Graphics2D)bi.getGraphics();
         synchronized (worldLock)
