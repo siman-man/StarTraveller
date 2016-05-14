@@ -176,7 +176,7 @@ class StarTraveller {
       if (g_turn <= g_starCount) {
         g_changeLine = 100;
       } else {
-        g_changeLine = 1000;
+        g_changeLine = 800;
       }
     } 
 
@@ -387,6 +387,7 @@ class StarTraveller {
       double T = 10000.0;
       double k = 10.0;
       double alpha = 0.999;
+      int type;
       ll startTime = getTimeOld();
 
       while(1) {
@@ -398,7 +399,14 @@ class StarTraveller {
 
         double baseScore = calcPathDist();
         //double baseScore = calcSubDist(c1, c2);
-        swapStar(c1, c2);
+
+        type = xor128()%2;
+
+        if (type == 0) {
+          reconnectPath(c1, c2);
+        } else {
+          swapStar(c1, c2);
+        }
         double newScore = calcPathDist();
         //double newScore = calcSubDist(c1, c2);
         double scoreDiff = baseScore - newScore;
@@ -415,7 +423,14 @@ class StarTraveller {
           minScore = dist;
         } else if (T > 0.0 && xor128()%100 < 100 * exp(scoreDiff/(k*T))) {
         } else {
-          swapStar(c1, c2);
+          //g_path = bestPath;
+
+          if (type == 0) {
+            //g_path = bestPath;
+            reconnectPath(c1, c2);
+          } else {
+            swapStar(c1, c2);
+          }
         }
 
         ll cycle = getCycle();
@@ -458,6 +473,21 @@ class StarTraveller {
       int temp = g_path[c1];
       g_path[c1] = g_path[c2];
       g_path[c2] = temp;
+    }
+
+    void reconnectPath(int c1, int c3) {
+      int c2 = (c1+1)%g_psize;
+      int i = c2;
+      int j = c3;
+
+      while(i < j) {
+        int temp = g_path[i];
+        g_path[i] = g_path[j];
+        g_path[j] = temp;
+
+        i++;
+        j--;
+      }
     }
 
     double calcSubDist(int c1, int c2) {
