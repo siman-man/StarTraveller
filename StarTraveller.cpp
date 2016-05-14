@@ -3,16 +3,23 @@
 #include <iostream>
 #include <cmath>
 #include <map>
+#include <sys/time.h>
 #include <cassert>
+#include <string.h>
 #include <limits.h>
 #include <sstream>
 #include <vector>
 
 using namespace std;
 
+typedef long long ll;
+
 const int SPACE_SIZE = 1024;
 const int MAX_STAR = 2000;
 const int MAX_GALAXY = 16;
+const int MAX_SHIP = 10;
+const ll CYCLE_PER_SEC = 1000000000;
+double TIME_LIMIT = 5.0;
 
 unsigned long long xor128(){
   static unsigned long long rx=123456789, ry=362436069, rz=521288629, rw=88675123;
@@ -21,12 +28,31 @@ unsigned long long xor128(){
   return (rw=(rw^(rw>>19))^(rt^(rt>>8)));
 }
 
+/*
+ll getTime() {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  ll result =  tv.tv_sec * 1000LL + tv.tv_usec / 1000LL;
+  return result;
+}
+*/
+
+unsigned long long int getCycle() {
+  unsigned int low, high;
+  __asm__ volatile ("rdtsc" : "=a" (low), "=d" (high));
+  return ((unsigned long long int)low) | ((unsigned long long int)high << 32);
+}
+
+double getTime(unsigned long long int begin_cycle) {
+  return (double)(getCycle() - begin_cycle) / CYCLE_PER_SEC;
+}
+
 inline double calcDist(int y1, int x1, int y2, int x2) {
-  return sqrt((y2-y1) * (y2-y1) + (x2-x1) * (x2-x1));
+  return sqrt((y2-y1)*(y2-y1) + (x2-x1)*(x2-x1));
 }
 
 inline int calcDistFast(int y1, int x1, int y2, int x2) {
-  return (y2-y1) * (y2-y1) + (x2-x1) * (x2-x1);
+  return ((y2-y1)*(y2-y1) + (x2-x1)*(x2-x1));
 }
 
 struct Star {
@@ -43,6 +69,10 @@ struct Star {
   }
 };
 
+struct Ship {
+  int sid;
+};
+
 struct Galaxy {
   int y;
   int x;
@@ -56,12 +86,16 @@ struct Galaxy {
   }
 };
 
-Star g_starList[MAX_STAR];
+vector<Star> g_starList;
+Ship g_shipList[MAX_SHIP];
 Galaxy g_galaxyList[MAX_GALAXY];
+vector<int> g_path;
+int g_psize;
 
 int g_turn;
 int g_galaxyCount;
 int g_starCount;
+int g_shipCount;
 
 class StarTraveller {
   public:
@@ -75,6 +109,7 @@ class StarTraveller {
       int minH = 1024;
       int maxW = 0;
       int minW = 1024;
+      vector<int> path;
 
       for (int i = 0; i < g_starCount; i++) {
         int x = stars[i*2];
@@ -85,11 +120,13 @@ class StarTraveller {
         maxW = max(maxW, x);
         minW = min(minW, x);
 
-        g_starList[i] = Star(y,x);
+        g_starList.push_back(Star(y,x));
+        path.push_back(i);
       }
 
       fprintf(stderr,"maxW = %d, minW = %d, maxH = %d, minH = %d\n", maxW, minW, maxH, minH);
 
+      TSPSolver(path);
       kmeans();
 
       return 0;
@@ -98,7 +135,19 @@ class StarTraveller {
     vector<int> makeMoves(vector<int> ufos, vector<int> ships) {
       g_turn++;
 
-      vector<int> ret;
+      g_shipCount = ships.size();
+      int ssize = ships.size();
+      for (int i = 0; i < ssize; i++) {
+        Ship *ship = getShip(i);
+
+        if (i == 0) {
+          ship->sid = g_path[g_turn-1];
+        } else {
+          ship->sid = ships[i];
+        }
+      }
+
+      /*
       for (int i = 0;i < g_starCount; i++) {
         if (!used[i]) {
           used[i] = 1;
@@ -111,8 +160,165 @@ class StarTraveller {
       while (ret.size() < ships.size()) {
         ret.push_back((ships[ret.size()]+1)%g_starCount);
       }
+      */
 
+      vector<int> ret = getOutput();
       return ret;
+    }
+
+    vector<int> TSPSolver(vector<int> &stars) {
+      g_path = stars;
+      g_psize = g_path.size();
+      vector<int> bestPath = g_path;
+      int c1, c2;
+
+      double minScore = calcPathDist();
+      
+      ll startCycle = getCycle();
+      double currentTime;
+      ll tryCount = 0;
+
+      while(1) {
+        tryCount++;
+        do {
+          c1 = xor128() % g_psize;
+          c2 = xor128() % g_psize;
+        } while (c1 == c2);
+
+        double baseScore = calcSubDist(c1, c2);
+        swapStar(c1, c2);
+        double newScore = calcSubDist(c1, c2);
+        double score = baseScore - newScore;
+
+        if (score > 3.0) {
+          bestPath = g_path;
+
+          double dist = calcPathDist();
+          /*
+          fprintf(stderr,"swap %d <-> %d\n", g_path[c1], g_path[c2]);
+          fprintf(stderr,"score = %f, %f -> %f\n", score, minScore, dist);
+          */
+          assert(minScore > dist);
+          minScore = dist;
+        } else {
+          swapStar(c1, c2);
+        }
+
+        currentTime = getTime(startCycle);
+
+        if (currentTime > TIME_LIMIT) {
+          break;
+        }
+      }
+
+      fprintf(stderr,"tryCount = %lld\n", tryCount);
+      double pathDist = calcPathDist();
+      //double pathDist = sqrt(calcPathDist());
+      fprintf(stderr,"path size = %d, pathDist = %f\n", g_psize, pathDist);
+
+      return bestPath;
+    }
+
+    void showPath() {
+      for (int i = 0; i < g_psize-1; i++) {
+        fprintf(stderr," %d ->", g_path[i]);
+      }
+      fprintf(stderr," %d\n", g_path[g_psize-1]);
+    }
+
+    void swapStar(int c1, int c2) {
+      int temp = g_path[c1];
+      g_path[c1] = g_path[c2];
+      g_path[c2] = temp;
+    }
+
+    double calcSubDist(int c1, int c2) {
+      int s1b = (c1 == 0)? g_path[g_psize-1] : g_path[c1-1];
+      int s1m = g_path[c1];
+      int s1a = g_path[(c1+1)%g_psize];
+
+      int s2b = (c2 == 0)? g_path[g_psize-1] : g_path[c2-1];
+      int s2m = g_path[c2];
+      int s2a = g_path[(c2+1)%g_psize];
+
+      Star *star1 = getStar(s1b);
+      Star *star2 = getStar(s1m);
+      Star *star3 = getStar(s1a);
+
+      Star *star4 = getStar(s2b);
+      Star *star5 = getStar(s2m);
+      Star *star6 = getStar(s2a);
+
+      double d1 = calcDist(star1->y, star1->x, star2->y, star2->x);
+      double d2 = calcDist(star2->y, star2->x, star3->y, star3->x);
+      double d3 = calcDist(star4->y, star4->x, star5->y, star5->x);
+      double d4 = calcDist(star5->y, star5->x, star6->y, star6->x);
+
+      return d1 + d2 + d3 + d4;
+    }
+
+    double calcDiffDist(int c1, int c2) {
+      int s1b = (c1 == 0)? g_path[g_psize-1] : g_path[c1-1];
+      int s1m = g_path[c1];
+      int s1a = g_path[(c1+1)%g_psize];
+
+      int s2b = (c2 == 0)? g_path[g_psize-1] : g_path[c2-1];
+      int s2m = g_path[c2];
+      int s2a = g_path[(c2+1)%g_psize];
+
+      Star *star1 = getStar(s1b);
+      Star *star2 = getStar(s1m);
+      Star *star3 = getStar(s1a);
+
+      Star *star4 = getStar(s2b);
+      Star *star5 = getStar(s2m);
+      Star *star6 = getStar(s2a);
+
+      double d1 = calcDist(star1->y, star1->x, star2->y, star2->x);
+      double d2 = calcDist(star2->y, star2->x, star3->y, star3->x);
+      double d3 = calcDist(star4->y, star4->x, star5->y, star5->x);
+      double d4 = calcDist(star5->y, star5->x, star6->y, star6->x);
+      double baseDist = d1 + d2 + d3 + d4;
+
+      double d5 = calcDist(star1->y, star1->x, star5->y, star5->x);
+      double d6 = calcDist(star5->y, star5->x, star3->y, star3->x);
+      double d7 = calcDist(star4->y, star4->x, star2->y, star2->x);
+      double d8 = calcDist(star2->y, star2->x, star6->y, star6->x);
+      double newDist = d5 + d6 + d7 + d8;
+
+      /*
+      if (baseDist > newDist) {
+        fprintf(stderr,"(%d -> %d -> %d) = %f, (%d -> %d -> %d) = %f\n",
+            s1b, s1m, s1a, (d1+d2), s2b, s2m, s2a, (d3+d4));
+        fprintf(stderr,"(%d -> %d -> %d) = %f, (%d -> %d -> %d) = %f\n",
+            s1b, s2m, s1a, (d5+d6), s2b, s1m, s2a, (d7+d8));
+        fprintf(stderr,"baseDist = %f, newDist = %f\n", baseDist, newDist);
+      }
+      */
+
+      return (baseDist - newDist);
+    }
+
+    ll calcPathDist() {
+      int psize = g_path.size();
+      ll totalDist = 0;
+
+      for (int i = 0; i < psize; i++) {
+        int s1 = g_path[i];
+        int s2 = g_path[(i+1)%psize];
+
+        Star *star1 = getStar(s1);
+        Star *star2 = getStar(s2);
+
+        int dist = calcDistFast(star1->y, star1->x, star2->y, star2->x);
+        double dd = sqrt(dist);
+
+        //fprintf(stderr,"%d -> %d = %4.2f\n", s1, s2, dd);
+
+        totalDist += dd;
+      }
+
+      return totalDist;
     }
 
     void kmeans() {
@@ -248,12 +454,27 @@ class StarTraveller {
       }
     }
 
+    vector<int> getOutput() {
+      vector<int> ret;
+
+      for (int i = 0; i < g_shipCount; i++) {
+        Ship *ship = getShip(i);
+        ret.push_back(ship->sid);
+      }
+
+      return ret;
+    }
+
     Galaxy *getGalaxy(int id) {
       return &g_galaxyList[id];
     }
 
     Star *getStar(int id) {
       return &g_starList[id];
+    }
+
+    Ship *getShip(int id) {
+      return &g_shipList[id];
     }
 };
 
