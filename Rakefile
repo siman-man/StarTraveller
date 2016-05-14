@@ -1,7 +1,7 @@
 require 'open3'
 
 FILE_NAME = "StarTraveller"
-SEED = 1
+SEED = 2
 
 desc 'c++ file compile'
 task :default do
@@ -16,13 +16,14 @@ end
 desc 'exec and view result'
 task :run do
   Rake::Task['compile'].invoke
-  system("java -jar ./visualizer.jar -size 8 -vis -seed #{SEED} -exec './#{FILE_NAME}'")
+  system("java -jar ./visualizer.jar -vis -seed #{SEED} -exec './#{FILE_NAME}'")
 end
 
 desc 'check single'
 task :one do
   Rake::Task['compile'].invoke
-  system("time java -jar visualizer.jar -seed #{SEED} -novis -exec './#{FILE_NAME}'")
+  #system("time java -jar StarTraveller.jar -save result.png -seed #{SEED} -novis -exec './#{FILE_NAME}'")
+  system("time java -jar visualizer.jar -save result.png -seed #{SEED} -novis -exec './#{FILE_NAME}'")
 end
 
 desc 'check for windows'
@@ -58,12 +59,12 @@ task :sample do
 
   File.open('result.txt', 'w') do |file|
     1.upto(10) do |seed|
-      file.puts("----- BEGIN ------")
+      file.puts("----- !BEGIN! ------")
       file.puts("Seed = #{seed}")
 
       data = Open3.capture3("time java -jar visualizer.jar -seed #{seed} -novis -exec './#{FILE_NAME}'")
       file.puts(data.select{|d| d.is_a?(String) }.flat_map{|d| d.split("\n") })
-      file.puts("----- END ------")
+      file.puts("----- !END! ------")
     end
   end
 
@@ -75,12 +76,12 @@ task :test do
   Rake::Task['compile'].invoke
 
   1001.upto(1100) do |num|
-    file.puts("----- BEGIN ------")
+    file.puts("----- !BEGIN! ------")
     file.puts("Seed = #{seed}")
 
     data = Open3.capture3("time java -jar visualizer.jar -seed #{seed} -novis -exec './#{FILE_NAME}'")
     file.puts(data.select{|d| d.is_a?(String) }.flat_map{|d| d.split("\n") })
-    file.puts("----- END ------")
+    file.puts("----- !END! ------")
   end
 
   system('ruby scripts/analyze.rb 100')
@@ -91,12 +92,12 @@ task :final do
   Rake::Task['compile'].invoke
 
   2001.upto(3000) do |num|
-    file.puts("----- BEGIN ------")
+    file.puts("----- !BEGIN! ------")
     file.puts("Seed = #{seed}")
 
     data = Open3.capture3("time java -jar visualizer.jar -seed #{seed} -novis -exec './#{FILE_NAME}'")
     file.puts(data.select{|d| d.is_a?(String) }.flat_map{|d| d.split("\n") })
-    file.puts("----- END ------")
+    file.puts("----- !END! ------")
   end
 
   system('ruby scripts/analyze.rb 1000')
