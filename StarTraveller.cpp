@@ -21,7 +21,7 @@ const int MAX_GALAXY = 16;
 const int MAX_SHIP = 10;
 const int MAX_UFO = 20;
 const ll CYCLE_PER_SEC = 2400000000;
-double TIME_LIMIT = 10.0;
+double TIME_LIMIT = 15.0;
 
 unsigned long long xor128(){
   static unsigned long long rx=123456789, ry=362436069, rz=521288629, rw=88675123;
@@ -87,16 +87,22 @@ struct UFO {
   int nid;
   int hitCount;
   int totalCount;
+  double totalMoveDist;
 
   UFO () {
     this->crew = 0;
     this->capacity = 1;
     this->hitCount = 0;
     this->totalCount = 0;
+    this->totalMoveDist = 0.0;
   }
 
   double hitRate() {
     return 100.0 * (hitCount / (double)totalCount);
+  }
+
+  double averageMoveDist() {
+    return totalMoveDist / totalCount;
   }
 };
 
@@ -198,12 +204,17 @@ class StarTraveller {
         UFO *ufo = getUFO(i);
 
         ufo->cid = ufos[i*3];
+        ufo->nid = ufos[i*3+1];
         Star *star = getStar(ufo->cid);
+        Star *nstar = getStar(ufo->nid);
+
+        double dist = calcDist(star->y, star->x, nstar->y, nstar->x);
 
         if (!star->visited) {
           ufo->hitCount++;
         }
 
+        ufo->totalMoveDist += dist;
         ufo->totalCount++;
 
         //fprintf(stderr,"UFO %d: hitRate = %f\n", i, ufo->hitRate());
