@@ -19,8 +19,9 @@ const int SPACE_SIZE = 1024;
 const int MAX_STAR = 2000;
 const int MAX_GALAXY = 16;
 const int MAX_SHIP = 10;
+const int MAX_UFO = 20;
 const ll CYCLE_PER_SEC = 2400000000;
-double TIME_LIMIT = 5.0;
+double TIME_LIMIT = 10.0;
 
 unsigned long long xor128(){
   static unsigned long long rx=123456789, ry=362436069, rz=521288629, rw=88675123;
@@ -78,6 +79,27 @@ struct Ship {
   }
 };
 
+struct UFO {
+  int capacity;
+  int crew;
+  int cid;
+  int sid;
+  int nid;
+  int hitCount;
+  int totalCount;
+
+  UFO () {
+    this->crew = 0;
+    this->capacity = 1;
+    this->hitCount = 0;
+    this->totalCount = 0;
+  }
+
+  double hitRate() {
+    return 100.0 * (hitCount / (double)totalCount);
+  }
+};
+
 struct Galaxy {
   int y;
   int x;
@@ -93,6 +115,7 @@ struct Galaxy {
 
 vector<Star> g_starList;
 Ship g_shipList[MAX_SHIP];
+UFO g_ufoList[MAX_UFO];
 Galaxy g_galaxyList[MAX_GALAXY];
 vector<int> g_path;
 int g_psize;
@@ -105,6 +128,7 @@ int g_shipCount;
 int g_ufoCount;
 int g_timeLimit;
 int g_remainCount;
+int g_changeLine;
 bool g_flag;
 bool g_checkFlag;
 
@@ -148,6 +172,14 @@ class StarTraveller {
       return 0;
     }
 
+    void setParameter() {
+      if (g_turn <= g_starCount) {
+        g_changeLine = 100;
+      } else {
+        g_changeLine = 1000;
+      }
+    } 
+
     vector<int> makeMoves(vector<int> ufos, vector<int> ships) {
       g_turn++;
       g_timeLimit--;
@@ -160,9 +192,32 @@ class StarTraveller {
         checkVisited(ships);
       }
 
+      setParameter();
+
+      for (int i = 0; i < g_ufoCount; i++) {
+        UFO *ufo = getUFO(i);
+
+        ufo->cid = ufos[i*3];
+        Star *star = getStar(ufo->cid);
+
+        if (!star->visited) {
+          ufo->hitCount++;
+        }
+
+        ufo->totalCount++;
+
+        //fprintf(stderr,"UFO %d: hitRate = %f\n", i, ufo->hitRate());
+      }
+
       if (!g_flag && g_remainCount >= g_timeLimit) {
         g_flag = true;
         fprintf(stderr,"remain count = %d\n", g_remainCount);
+      }
+
+      for (int i = 0; i < g_ufoCount; i++) {
+        UFO *ufo = getUFO(i);
+        ufo->sid = ufos[i*3];
+        ufo->nid = ufos[i*3+1];
       }
 
       if (g_flag && !g_checkFlag) {
@@ -197,12 +252,16 @@ class StarTraveller {
           }
           */
         } else {
+          moveShipWithUFO(ufos, ships);
+
+          /*
           if (i < g_ufoCount) {
             ship->uid = i;
             ship->sid = ufos[i*3+1];
           } else {
             ship->sid = ships[i];
           }
+          */
         }
       }
 
@@ -267,11 +326,57 @@ class StarTraveller {
       }
     }
 
+    void moveShipWithUFO(vector<int> &ufos, vector<int> &ships) {
+      for (int i = 0; i < g_shipCount; i++) {
+        Ship *ship = getShip(i);
+
+        if (ship->uid >= 0) {
+          UFO *ufo = getUFO(ship->uid);
+
+          ship->sid = ufos[ship->uid*3+1];
+        } else {
+
+          double minDist = DBL_MAX;
+          int uid = -1;
+          int nid = -1;
+
+          for (int j = 0; j < g_ufoCount; j++) {
+            UFO *ufo = getUFO(j);
+
+            if (ufo->capacity <= ufo->crew) continue; 
+
+            Star *from = getStar(ufo->nid);
+            Star *to = getStar(ship->sid);
+
+            double dist = calcDist(from->y, from->x, to->y, to->x);
+
+            if (minDist > dist) {
+              minDist = dist;
+              nid = ufo->nid;
+              uid = j;
+            }
+          }
+
+          if (minDist <= g_changeLine) {
+            ship->sid = nid;
+            ship->uid = uid;
+            g_ufoList[uid].crew++;
+          } else {
+            ship->sid = ships[i];
+          }
+        }
+      }
+    }
+
     vector<int> TSPSolver(vector<int> &stars) {
       g_path = stars;
       g_psize = g_path.size();
       vector<int> bestPath = g_path;
       int c1, c2;
+
+      if (g_psize <= 2) {
+        return bestPath;
+      }
 
       double minScore = calcPathDist();
       
@@ -291,9 +396,11 @@ class StarTraveller {
           c2 = xor128() % g_psize;
         } while (c1 == c2);
 
-        double baseScore = calcSubDist(c1, c2);
+        double baseScore = calcPathDist();
+        //double baseScore = calcSubDist(c1, c2);
         swapStar(c1, c2);
-        double newScore = calcSubDist(c1, c2);
+        double newScore = calcPathDist();
+        //double newScore = calcSubDist(c1, c2);
         double scoreDiff = baseScore - newScore;
 
         if (scoreDiff > 0.0) {
@@ -306,7 +413,7 @@ class StarTraveller {
           */
           //assert(minScore > dist);
           minScore = dist;
-        } else if (false && T > 0.0 && xor128()%100 < 100 * exp(scoreDiff/(k*T))) {
+        } else if (T > 0.0 && xor128()%100 < 100 * exp(scoreDiff/(k*T))) {
         } else {
           swapStar(c1, c2);
         }
@@ -597,11 +704,16 @@ class StarTraveller {
     Ship *getShip(int id) {
       return &g_shipList[id];
     }
+
+    UFO *getUFO(int id) {
+      return &g_ufoList[id];
+    }
 };
 
 // -------8<------- end of solution submitted to the website -------8<-------
 template<class T> void getVector(vector<T>& v) { for (int i = 0; i < v.size(); ++i) cin >> v[i];}
 int main() {
+  TIME_LIMIT = 5.0;
   int NStars; cin >> NStars; vector<int> stars(NStars);
   getVector(stars);
   StarTraveller algo;
