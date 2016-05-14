@@ -5,6 +5,7 @@
 #include <map>
 #include <sys/time.h>
 #include <cassert>
+#include <float.h>
 #include <string.h>
 #include <limits.h>
 #include <sstream>
@@ -18,7 +19,7 @@ const int SPACE_SIZE = 1024;
 const int MAX_STAR = 2000;
 const int MAX_GALAXY = 16;
 const int MAX_SHIP = 10;
-const ll CYCLE_PER_SEC = 1000000000;
+const ll CYCLE_PER_SEC = 2400000000;
 double TIME_LIMIT = 5.0;
 
 unsigned long long xor128(){
@@ -28,14 +29,12 @@ unsigned long long xor128(){
   return (rw=(rw^(rw>>19))^(rt^(rt>>8)));
 }
 
-/*
-ll getTime() {
+ll getTimeOld() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
   ll result =  tv.tv_sec * 1000LL + tv.tv_usec / 1000LL;
   return result;
 }
-*/
 
 unsigned long long int getCycle() {
   unsigned int low, high;
@@ -71,6 +70,12 @@ struct Star {
 
 struct Ship {
   int sid;
+  int uid;
+
+  Ship () {
+    this->sid = -1;
+    this->uid = -1;
+  }
 };
 
 struct Galaxy {
@@ -93,9 +98,15 @@ vector<int> g_path;
 int g_psize;
 
 int g_turn;
+int g_index;
 int g_galaxyCount;
 int g_starCount;
 int g_shipCount;
+int g_ufoCount;
+int g_timeLimit;
+int g_remainCount;
+bool g_flag;
+bool g_checkFlag;
 
 class StarTraveller {
   public:
@@ -105,6 +116,11 @@ class StarTraveller {
       g_starCount = stars.size()/2;
       used.resize(g_starCount, 0);
       g_turn = 0;
+      g_index = 0;
+      g_timeLimit = g_starCount * 4;
+      g_remainCount = g_starCount;
+      g_checkFlag = false;
+      g_flag = false;
       int maxH = 0;
       int minH = 1024;
       int maxW = 0;
@@ -126,7 +142,7 @@ class StarTraveller {
 
       fprintf(stderr,"maxW = %d, minW = %d, maxH = %d, minH = %d\n", maxW, minW, maxH, minH);
 
-      TSPSolver(path);
+      //g_path = TSPSolver(path);
       kmeans();
 
       return 0;
@@ -134,16 +150,59 @@ class StarTraveller {
 
     vector<int> makeMoves(vector<int> ufos, vector<int> ships) {
       g_turn++;
+      g_timeLimit--;
 
+      g_ufoCount = ufos.size() / 3;
       g_shipCount = ships.size();
       int ssize = ships.size();
+
+      if (g_turn > 1) {
+        checkVisited(ships);
+      }
+
+      if (!g_flag && g_remainCount >= g_timeLimit) {
+        g_flag = true;
+        fprintf(stderr,"remain count = %d\n", g_remainCount);
+      }
+
+      if (g_flag && !g_checkFlag) {
+        vector<int> path;
+        g_checkFlag = true;
+
+        for (int i = 0; i < g_starCount; i++) {
+          Star *star = getStar(i);
+
+          if (!star->visited) {
+            path.push_back(i);
+          }
+        }
+
+        g_path = TSPSolver(path);
+      }
+
       for (int i = 0; i < ssize; i++) {
         Ship *ship = getShip(i);
 
-        if (i == 0) {
-          ship->sid = g_path[g_turn-1];
-        } else {
+        if (g_turn == 1) {
           ship->sid = ships[i];
+        } else if (g_flag) {
+          moveShip(ships);
+          break;
+          /*
+          if (i == 0) {
+            ship->sid = g_path[g_index];
+            g_index++;
+          } else {
+            ship->sid = ships[i];
+          }
+          */
+        } else {
+          if (i < g_ufoCount) {
+            ship->uid = i;
+            ship->sid = ufos[i*3+1];
+          } else {
+            ship->sid = ships[i];
+          }
         }
       }
 
@@ -166,6 +225,48 @@ class StarTraveller {
       return ret;
     }
 
+    void checkVisited(vector<int> &ships) {
+      for (int i = 0; i < g_shipCount; i++) {
+        Star *star = getStar(ships[i]);
+
+        if (!star->visited) {
+          g_remainCount--;
+        }
+
+        star->visited = true;
+      }
+    }
+
+    void moveShip(vector<int> &ships) {
+      int target = g_path[g_index];
+      g_index++;
+      double minDist = DBL_MAX;
+      int moveId = -1;
+      Star *ts = getStar(target);
+
+      for (int i = 0; i < g_shipCount; i++) {
+        Ship *ship = getShip(i);
+        Star *star = getStar(ship->sid);
+        
+        double dist = calcDist(star->y, star->x, ts->y, ts->x);
+
+        if (minDist > dist) {
+          minDist = dist;
+          moveId = i;
+        }
+      }
+
+      for (int i = 0; i < g_shipCount; i++) {
+        Ship *ship = getShip(i);
+
+        if (i == moveId) {
+          ship->sid = target;
+        } else {
+          ship->sid = ships[i];
+        }
+      }
+    }
+
     vector<int> TSPSolver(vector<int> &stars) {
       g_path = stars;
       g_psize = g_path.size();
@@ -178,6 +279,11 @@ class StarTraveller {
       double currentTime;
       ll tryCount = 0;
 
+      double T = 10000.0;
+      double k = 10.0;
+      double alpha = 0.999;
+      ll startTime = getTimeOld();
+
       while(1) {
         tryCount++;
         do {
@@ -188,9 +294,9 @@ class StarTraveller {
         double baseScore = calcSubDist(c1, c2);
         swapStar(c1, c2);
         double newScore = calcSubDist(c1, c2);
-        double score = baseScore - newScore;
+        double scoreDiff = baseScore - newScore;
 
-        if (score > 3.0) {
+        if (scoreDiff > 0.0) {
           bestPath = g_path;
 
           double dist = calcPathDist();
@@ -198,17 +304,32 @@ class StarTraveller {
           fprintf(stderr,"swap %d <-> %d\n", g_path[c1], g_path[c2]);
           fprintf(stderr,"score = %f, %f -> %f\n", score, minScore, dist);
           */
-          assert(minScore > dist);
+          //assert(minScore > dist);
           minScore = dist;
+        } else if (false && T > 0.0 && xor128()%100 < 100 * exp(scoreDiff/(k*T))) {
         } else {
           swapStar(c1, c2);
         }
 
+        ll cycle = getCycle();
         currentTime = getTime(startCycle);
 
         if (currentTime > TIME_LIMIT) {
           break;
         }
+
+        /*
+        if (tryCount % 100 == 0) {
+          ll ctime = getTimeOld() - startTime;
+
+          if (ctime > 990) {
+            fprintf(stderr,"cycle = %lld\n", cycle - startCycle);
+            break;
+          }
+        }
+        */
+
+        T *= alpha;
       }
 
       fprintf(stderr,"tryCount = %lld\n", tryCount);
@@ -479,38 +600,20 @@ class StarTraveller {
 };
 
 // -------8<------- end of solution submitted to the website -------8<-------
-
-template<class T> void getVector(vector<T>& v) {
-  for (int i = 0; i < v.size(); ++i)
-    cin >> v[i];
-}
-
+template<class T> void getVector(vector<T>& v) { for (int i = 0; i < v.size(); ++i) cin >> v[i];}
 int main() {
-  int NStars;
-  cin >> NStars;
-  vector<int> stars(NStars);
+  int NStars; cin >> NStars; vector<int> stars(NStars);
   getVector(stars);
-
   StarTraveller algo;
   int ignore = algo.init(stars);
-  cout << ignore << endl;
-  cout.flush();
-
-  while (true) {
-    int NUfo;
-    cin >> NUfo;
-    if (NUfo<0) break;
-    vector<int> ufos(NUfo);
-    getVector(ufos);
-    int NShips;
-    cin >> NShips;
-    vector<int> ships(NShips);
-    getVector(ships);
+  cout << ignore << endl; cout.flush();
+  while (true) { int NUfo;
+    cin >> NUfo; if (NUfo<0) break; vector<int> ufos(NUfo);
+    getVector(ufos); int NShips; cin >> NShips;
+    vector<int> ships(NShips); getVector(ships);
     vector<int> ret = algo.makeMoves(ufos, ships);
     cout << ret.size() << endl;
-    for (int i = 0; i < ret.size(); ++i) {
-      cout << ret[i] << endl;
-    }
+    for (int i = 0; i < ret.size(); ++i) { cout << ret[i] << endl; }
     cout.flush();
   }
 }

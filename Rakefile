@@ -1,7 +1,7 @@
 require 'open3'
 
 FILE_NAME = "StarTraveller"
-SEED = 1
+SEED = 4
 
 desc 'c++ file compile'
 task :default do
@@ -59,6 +59,7 @@ task :sample do
 
   File.open('result.txt', 'w') do |file|
     1.upto(10) do |seed|
+      puts "seed = #{seed}"
       file.puts("----- !BEGIN! ------")
       file.puts("Seed = #{seed}")
 
@@ -75,13 +76,16 @@ task :test do
   system('rm result.txt')
   Rake::Task['compile'].invoke
 
-  1001.upto(1100) do |num|
-    file.puts("----- !BEGIN! ------")
-    file.puts("Seed = #{seed}")
+  File.open('result.txt', 'w') do |file|
+    1001.upto(1100) do |seed|
+      puts "seed = #{seed}"
+      file.puts("----- !BEGIN! ------")
+      file.puts("Seed = #{seed}")
 
-    data = Open3.capture3("time java -jar visualizer.jar -seed #{seed} -novis -exec './#{FILE_NAME}'")
-    file.puts(data.select{|d| d.is_a?(String) }.flat_map{|d| d.split("\n") })
-    file.puts("----- !END! ------")
+      data = Open3.capture3("time java -jar visualizer.jar -seed #{seed} -novis -exec './#{FILE_NAME}'")
+      file.puts(data.select{|d| d.is_a?(String) }.flat_map{|d| d.split("\n") })
+      file.puts("----- !END! ------")
+    end
   end
 
   system('ruby scripts/analyze.rb 100')
