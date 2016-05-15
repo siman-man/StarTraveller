@@ -187,7 +187,7 @@ class StarTraveller {
       if (g_turn <= g_starCount) {
         g_changeLine = 100;
       } else {
-        g_changeLine = 800;
+        g_changeLine = 512;
       }
     } 
 
@@ -325,10 +325,8 @@ class StarTraveller {
         } else if (g_flag) {
           if (g_shipCount <= 1) {
             moveShipSingle();
-          } else if (g_shipCount <= 10) {
-            moveShip();
           } else {
-            moveShipMulti();
+            moveShip();
           }
           break;
         } else {
@@ -385,43 +383,14 @@ class StarTraveller {
       }
     }
 
-    void moveShipMulti() {
-      double minDist = DBL_MAX;
-      int moveId = -1;
-      int targetId = -1;
-
-      for (int i = 0; i < g_shipCount; i++) {
-        Ship *ship = getShip(i);
-
-        for (int j = 0; j < g_psize; j++) {
-          int target = g_path[j];
-          Star *star = getStar(target);
-
-          if (star->visited) continue;
-
-          double dist = DIST_TABLE[ship->sid][target];
-
-          if (minDist > dist) {
-            minDist = dist;
-            moveId = i;
-            targetId = target;
-          }
-        }
-      }
-
-      for (int i = 0; i < g_shipCount; i++) {
-        Ship *ship = getShip(i);
-
-        if (i == moveId) {
-          ship->sid = targetId;
-        }
-      }
-    }
-
     void moveShipSingle() {
       Ship *flagShip = getShip(g_flagShipId);
       int nid = flagShip->path.front(); flagShip->path.pop();
-      flagShip->sid = nid;
+      Star *star = getStar(nid);
+
+      if (!star->visited) {
+        flagShip->sid = nid;
+      }
     }
 
     void moveShip() {
@@ -429,6 +398,9 @@ class StarTraveller {
       int nid = flagShip->path.front(); flagShip->path.pop();
       double minDist = DBL_MAX;
       int fid = -1;
+      Star *star = getStar(nid);
+
+      if (star->visited) return;
 
       for (int i = 0; i < g_shipCount; i++) {
         Ship *ship = getShip(i);
@@ -451,40 +423,48 @@ class StarTraveller {
     }
 
     void moveShipWithUFO(vector<int> &ufos, vector<int> &ships) {
+      map<int, double> distList;
+
+      for (int j = 0; j < g_ufoCount; j++) {
+        UFO *ufo = getUFO(j);
+
+        if (ufo->capacity <= ufo->crew) continue; 
+
+        double minDist = DBL_MAX;
+        int uid = -1;
+        int nid = -1;
+        int shipId = -1;
+
+        for (int i = 0; i < g_shipCount; i++) {
+          Ship *ship = getShip(i);
+
+          if (ship->uid >= 0) continue;
+
+          double dist = DIST_TABLE[ufo->nid][ship->sid];
+
+          if (minDist > dist) {
+            minDist = dist;
+            nid = ufo->nid;
+            uid = j;
+            shipId = i;
+          }
+        }
+
+        Ship *ship = getShip(shipId);
+
+        if (minDist <= g_changeLine) {
+          ship->sid = nid;
+          ship->uid = uid;
+          g_ufoList[uid].crew++;
+        }
+      }
+
       for (int i = 0; i < g_shipCount; i++) {
         Ship *ship = getShip(i);
 
         if (ship->uid >= 0) {
           UFO *ufo = getUFO(ship->uid);
-
           ship->sid = ufos[ship->uid*3+1];
-        } else {
-
-          double minDist = DBL_MAX;
-          int uid = -1;
-          int nid = -1;
-
-          for (int j = 0; j < g_ufoCount; j++) {
-            UFO *ufo = getUFO(j);
-
-            if (ufo->capacity <= ufo->crew) continue; 
-
-            double dist = DIST_TABLE[ufo->nid][ship->sid];
-
-            if (minDist > dist) {
-              minDist = dist;
-              nid = ufo->nid;
-              uid = j;
-            }
-          }
-
-          if (minDist <= g_changeLine) {
-            ship->sid = nid;
-            ship->uid = uid;
-            g_ufoList[uid].crew++;
-          } else {
-            ship->sid = ships[i];
-          }
         }
       }
     }
@@ -493,13 +473,15 @@ class StarTraveller {
       g_path = stars;
       g_psize = g_path.size();
       vector<int> bestPath = g_path;
+      vector<int> goodPath = g_path;
       int c1, c2;
 
       if (g_psize <= 2) {
         return bestPath;
       }
 
-      double minScore = calcPathDist();
+      double bestScore = calcPathDist();
+      double goodScore = bestScore;
 
       ll startCycle = getCycle();
       double currentTime;
@@ -517,9 +499,6 @@ class StarTraveller {
           c2 = xor128() % g_psize;
         } while (c1 == c2);
 
-        double baseScore = calcPathDist();
-        //double baseScore = calcSubDist(c1, c2);
-
         type = xor128()%2;
 
         switch(type) {
@@ -530,24 +509,36 @@ class StarTraveller {
             swapStar(c1, c2);
             break;
           default:
+            reconnectPath(c1, c2);
             break;
         }
 
         double newScore = calcPathDist();
         //double newScore = calcSubDist(c1, c2);
-        double scoreDiff = baseScore - newScore;
+        double scoreDiff = goodScore - newScore;
 
-        if (minScore > newScore) {
-          minScore = newScore;
+        if (bestScore > newScore) {
+          bestScore = newScore;
           bestPath = g_path;
-        } else if (false && T > 0.0 && xor128()%100 < 100 * exp(scoreDiff/(k*T))) {
+        }
+
+        if (goodScore > newScore) {
+          goodScore = newScore;
+        } else if (false && xor128()%100 < 100 * exp(scoreDiff/(k*T))) {
+          goodScore = newScore;
         } else {
           //g_path = bestPath;
 
-          if (type == 0) {
-            reconnectPath(c1, c2);
-          } else {
-            swapStar(c1, c2);
+          switch (type) {
+            case 0:
+              reconnectPath(c1, c2);
+              break;
+            case 1:
+              swapStar(c1, c2);
+              break;
+            default:
+              reconnectPath(c1, c2);
+              break;
           }
         }
 
@@ -564,7 +555,7 @@ class StarTraveller {
 
       fprintf(stderr,"tryCount = %lld\n", tryCount);
       //double pathDist = sqrt(calcPathDist());
-      fprintf(stderr,"path size = %d, pathDist = %f\n", g_psize, minScore);
+      fprintf(stderr,"path size = %d, pathDist = %f\n", g_psize, bestScore);
 
       return bestPath;
     }
