@@ -499,7 +499,7 @@ class StarTraveller {
           c2 = xor128() % g_psize;
         } while (c1 == c2);
 
-        type = xor128()%2;
+        type = xor128()%3;
 
         switch(type) {
           case 0:
@@ -508,13 +508,15 @@ class StarTraveller {
           case 1:
             swapStar(c1, c2);
             break;
+          case 2:
+            insertStar(c1, c2);
+            break;
           default:
             reconnectPath(c1, c2);
             break;
         }
 
         double newScore = calcPathDist();
-        //double newScore = calcSubDist(c1, c2);
         double scoreDiff = goodScore - newScore;
 
         if (bestScore > newScore) {
@@ -524,7 +526,7 @@ class StarTraveller {
 
         if (goodScore > newScore) {
           goodScore = newScore;
-        } else if (false && xor128()%100 < 100 * exp(scoreDiff/(k*T))) {
+        } else if (xor128()%100 < 100 * exp(scoreDiff/(k*T))) {
           goodScore = newScore;
         } else {
           //g_path = bestPath;
@@ -535,6 +537,9 @@ class StarTraveller {
               break;
             case 1:
               swapStar(c1, c2);
+              break;
+            case 2:
+              g_path = bestPath;
               break;
             default:
               reconnectPath(c1, c2);
@@ -573,6 +578,13 @@ class StarTraveller {
       g_path[c2] = temp;
     }
 
+    void insertStar(int c1, int c2) {
+      int temp = g_path[c1];
+
+      g_path.erase(g_path.begin() + c1);
+      g_path.insert(g_path.begin() + c2, temp);
+    }
+
     void reconnectPath(int c1, int c3) {
       int i = c1;
       int j = c3;
@@ -590,31 +602,6 @@ class StarTraveller {
         i++;
         j--;
       }
-    }
-
-    double calcSubDist(int c1, int c2) {
-      int s1b = (c1 == 0)? g_path[g_psize-1] : g_path[c1-1];
-      int s1m = g_path[c1];
-      int s1a = g_path[(c1+1)%g_psize];
-
-      int s2b = (c2 == 0)? g_path[g_psize-1] : g_path[c2-1];
-      int s2m = g_path[c2];
-      int s2a = g_path[(c2+1)%g_psize];
-
-      Star *star1 = getStar(s1b);
-      Star *star2 = getStar(s1m);
-      Star *star3 = getStar(s1a);
-
-      Star *star4 = getStar(s2b);
-      Star *star5 = getStar(s2m);
-      Star *star6 = getStar(s2a);
-
-      double d1 = calcDist(star1->y, star1->x, star2->y, star2->x);
-      double d2 = calcDist(star2->y, star2->x, star3->y, star3->x);
-      double d3 = calcDist(star4->y, star4->x, star5->y, star5->x);
-      double d4 = calcDist(star5->y, star5->x, star6->y, star6->x);
-
-      return d1 + d2 + d3 + d4;
     }
 
     double calcPathDist() {
