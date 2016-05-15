@@ -186,7 +186,7 @@ class StarTraveller {
       if (g_turn <= g_starCount) {
         g_changeLine = 100;
       } else {
-        g_changeLine = 512;
+        g_changeLine = 256;
       }
     } 
 
@@ -328,7 +328,7 @@ class StarTraveller {
           }
           break;
         } else {
-          moveShipWithUFO(ufos);
+          moveShipWithUFO();
           break;
         }
       }
@@ -425,7 +425,7 @@ class StarTraveller {
       }
     }
 
-    void moveShipWithUFO(vector<int> &ufos) {
+    void moveShipWithUFO() {
       map<int, double> distList;
 
       for (int j = 0; j < g_ufoCount; j++) {
@@ -601,7 +601,7 @@ class StarTraveller {
         j = c1;
       }
 
-      while(i < j) {
+      while (i < j) {
         int temp = g_path[i];
         g_path[i] = g_path[j];
         g_path[j] = temp;
