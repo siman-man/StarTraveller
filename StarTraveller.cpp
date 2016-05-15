@@ -81,9 +81,9 @@ struct Ship {
 struct UFO {
   int capacity;
   int crew;
-  int cid;
   int sid;
   int nid;
+  int nnid;
   int hitCount;
   int totalCount;
   double totalMoveDist;
@@ -135,6 +135,7 @@ int g_timeLimit;
 int g_remainCount;
 int g_changeLine;
 int g_flagShipId;
+int g_noupdate;
 bool g_flag;
 bool g_checkFlag;
 
@@ -151,6 +152,7 @@ class StarTraveller {
       g_remainCount = g_starCount;
       g_checkFlag = false;
       g_flag = false;
+      g_noupdate = 0;
       vector<int> path;
 
       for (int i = 0; i < g_starCount; i++) {
@@ -262,7 +264,11 @@ class StarTraveller {
       int ssize = ships.size();
 
       if (g_turn > 1) {
-        checkVisited(ships);
+        if (checkVisited(ships)) {
+          g_noupdate = 0;
+        } else {
+          g_noupdate++;
+        }
       }
 
       setParameter();
@@ -270,11 +276,12 @@ class StarTraveller {
       for (int i = 0; i < g_ufoCount; i++) {
         UFO *ufo = getUFO(i);
 
-        ufo->cid = ufos[i*3];
+        ufo->sid = ufos[i*3];
         ufo->nid = ufos[i*3+1];
-        Star *star = getStar(ufo->cid);
+        ufo->nnid = ufos[i*3+2];
+        Star *star = getStar(ufo->sid);
 
-        double dist = DIST_TABLE[ufo->cid][ufo->nid];
+        double dist = DIST_TABLE[ufo->sid][ufo->nid];
 
         if (!star->visited) {
           ufo->hitCount++;
@@ -289,12 +296,6 @@ class StarTraveller {
       if (!g_flag && g_remainCount > g_timeLimit) {
         g_flag = true;
         fprintf(stderr,"remain count = %d\n", g_remainCount);
-      }
-
-      for (int i = 0; i < g_ufoCount; i++) {
-        UFO *ufo = getUFO(i);
-        ufo->sid = ufos[i*3];
-        ufo->nid = ufos[i*3+1];
       }
 
       if (g_flag && !g_checkFlag) {
@@ -327,7 +328,7 @@ class StarTraveller {
           }
           break;
         } else {
-          moveShipWithUFO(ufos, ships);
+          moveShipWithUFO(ufos);
           break;
         }
       }
@@ -368,16 +369,21 @@ class StarTraveller {
       return ret;
     }
 
-    void checkVisited(vector<int> &ships) {
+    bool checkVisited(vector<int> &ships) {
+      bool update = false;
+
       for (int i = 0; i < g_shipCount; i++) {
         Star *star = getStar(ships[i]);
 
         if (!star->visited) {
+          update = true;
           g_remainCount--;
         }
 
         star->visited = true;
       }
+
+      return update;
     }
 
     void moveShipSingle() {
@@ -419,7 +425,7 @@ class StarTraveller {
       }
     }
 
-    void moveShipWithUFO(vector<int> &ufos, vector<int> &ships) {
+    void moveShipWithUFO(vector<int> &ufos) {
       map<int, double> distList;
 
       for (int j = 0; j < g_ufoCount; j++) {
@@ -461,7 +467,13 @@ class StarTraveller {
 
         if (ship->uid >= 0) {
           UFO *ufo = getUFO(ship->uid);
-          ship->sid = ufos[ship->uid*3+1];
+          Star *nstar = getStar(ufo->nid);
+
+          if (ship->sid == ufo->sid && ufo->sid == ufo->nnid && nstar->visited) {
+            ship->sid = ufo->sid;
+          } else {
+            ship->sid = ufo->nid;
+          }
         }
       }
     }
@@ -526,8 +538,6 @@ class StarTraveller {
         } else if (xor128()%100 < 100 * exp(scoreDiff/(k*T))) {
           goodScore = newScore;
         } else {
-          //g_path = bestPath;
-
           switch (type) {
             case 0:
               reconnectPath(c1, c2);
@@ -578,8 +588,8 @@ class StarTraveller {
     void insertStar(int c1, int c2) {
       int temp = g_path[c1];
 
-      g_path.erase(g_path.begin() + c1);
-      g_path.insert(g_path.begin() + c2, temp);
+      g_path.erase(g_path.begin()+c1);
+      g_path.insert(g_path.begin()+c2, temp);
     }
 
     void reconnectPath(int c1, int c3) {
@@ -649,8 +659,7 @@ template<class T> void getVector(vector<T>& v) { for (int i = 0; i < v.size(); +
 int main() {
   TIME_LIMIT = 5.0;
   int NStars; cin >> NStars; vector<int> stars(NStars);
-  getVector(stars);
-  StarTraveller algo;
+  getVector(stars); StarTraveller algo;
   int ignore = algo.init(stars);
   cout << ignore << endl; cout.flush();
   while (true) { int NUfo;
@@ -660,7 +669,5 @@ int main() {
     vector<int> ret = algo.makeMoves(ufos, ships);
     cout << ret.size() << endl;
     for (int i = 0; i < ret.size(); ++i) { cout << ret[i] << endl; }
-    cout.flush();
-  }
-}
+    cout.flush();}}
 
