@@ -7,6 +7,7 @@
 #include <cassert>
 #include <float.h>
 #include <string.h>
+#include <queue>
 #include <limits.h>
 #include <sstream>
 #include <vector>
@@ -67,10 +68,13 @@ struct Star {
 struct Ship {
   int sid;
   int uid;
+  bool flag;
+  queue<int> path;
 
   Ship () {
     this->sid = -1;
     this->uid = -1;
+    this->flag = false;
   }
 };
 
@@ -130,6 +134,7 @@ int g_ufoCount;
 int g_timeLimit;
 int g_remainCount;
 int g_changeLine;
+int g_flagShipId;
 bool g_flag;
 bool g_checkFlag;
 
@@ -185,6 +190,71 @@ class StarTraveller {
         g_changeLine = 800;
       }
     } 
+
+    void directFlagShip() {
+      double minDist = DBL_MAX;
+      int targetId = -1;
+      int index = -1;
+
+      for (int i = 0; i < g_shipCount; i++) {
+        Ship *ship = getShip(i);
+
+        for (int j = 0; j < g_psize; j++) {
+          int target = g_path[j];
+          Star *star = getStar(target);
+
+          if (star->visited) continue;
+
+          double dist = DIST_TABLE[ship->sid][target];
+
+          if (minDist > dist) {
+            minDist = dist;
+            g_flagShipId = i;
+            targetId = target;
+            index = j;
+          }
+        }
+      }
+
+      Ship *flagShip = getShip(g_flagShipId);
+      flagShip->flag = true;
+
+      int bid = (index == 0)? g_psize-1 : index-1;
+      int aid = (index+1)%g_psize;
+
+      int d1 = DIST_TABLE[g_path[bid]][g_path[index]];
+      int d2 = DIST_TABLE[g_path[index]][g_path[aid]];
+
+      if (d1 > d2) {
+        for (int i = 0; i < g_psize; i++) {
+          int sid = g_path[(index+i)%g_psize];
+          flagShip->path.push(sid);
+        }
+      } else {
+        for (int i = 0; i < g_psize; i++) {
+          int j = index-i;
+          int sid;
+
+          if (j < 0) {
+            sid = g_path[g_psize+j];
+          } else {
+            sid = g_path[j];
+          }
+          flagShip->path.push(sid);
+        }
+      }
+    }
+
+    void changeFlagShip(int id) {
+      fprintf(stderr,"changeFlagShip %d -> %d\n", g_flagShipId, id);
+      Ship *flagShip = getShip(g_flagShipId);
+      flagShip->flag = false;
+
+      g_flagShipId = id;
+      Ship *newFlagShip = getShip(id);
+      newFlagShip->flag = true;
+      newFlagShip->path = flagShip->path;
+    }
 
     vector<int> makeMoves(vector<int> ufos, vector<int> ships) {
       g_turn++;
@@ -242,7 +312,9 @@ class StarTraveller {
           }
         }
 
-        g_path = TSPSolver(path);
+        vector<int> firstPath = createFirstPath(path);
+        g_path = TSPSolver(firstPath);
+        directFlagShip();
       }
 
       for (int i = 0; i < ssize; i++) {
@@ -251,7 +323,13 @@ class StarTraveller {
         if (g_turn == 1) {
           ship->sid = ships[i];
         } else if (g_flag) {
-          moveShip(ships);
+          if (g_shipCount <= 1) {
+            moveShipSingle();
+          } else if (g_shipCount <= 10) {
+            moveShip();
+          } else {
+            moveShipMulti();
+          }
           break;
         } else {
           moveShipWithUFO(ufos, ships);
@@ -260,6 +338,38 @@ class StarTraveller {
       }
 
       vector<int> ret = getOutput();
+      return ret;
+    }
+
+    vector<int> createFirstPath(vector<int> &path) {
+      map<int, bool> checkList;
+      vector<int> ret;
+      int psize = path.size();
+      int cid = path[0];
+      int nid;
+      ret.push_back(cid);
+
+      for (int i = 0; i < psize-1; i++) {
+        double minDist = DBL_MAX;
+        checkList[cid] = true;
+
+        for (int j = 0; j < psize; j++) {
+          int id = path[j];
+
+          if (checkList[id]) continue;
+
+          double dist = DIST_TABLE[cid][id];
+
+          if (minDist > dist) {
+            minDist = dist;
+            nid = id;
+          }
+        }
+
+        ret.push_back(nid);
+        cid = nid;
+      }
+
       return ret;
     }
 
@@ -275,14 +385,14 @@ class StarTraveller {
       }
     }
 
-    void moveShip(vector<int> &ships) {
+    void moveShipMulti() {
       double minDist = DBL_MAX;
       int moveId = -1;
       int targetId = -1;
 
       for (int i = 0; i < g_shipCount; i++) {
         Ship *ship = getShip(i);
-        
+
         for (int j = 0; j < g_psize; j++) {
           int target = g_path[j];
           Star *star = getStar(target);
@@ -304,9 +414,39 @@ class StarTraveller {
 
         if (i == moveId) {
           ship->sid = targetId;
-        } else {
-          ship->sid = ships[i];
         }
+      }
+    }
+
+    void moveShipSingle() {
+      Ship *flagShip = getShip(g_flagShipId);
+      int nid = flagShip->path.front(); flagShip->path.pop();
+      flagShip->sid = nid;
+    }
+
+    void moveShip() {
+      Ship *flagShip = getShip(g_flagShipId);
+      int nid = flagShip->path.front(); flagShip->path.pop();
+      double minDist = DBL_MAX;
+      int fid = -1;
+
+      for (int i = 0; i < g_shipCount; i++) {
+        Ship *ship = getShip(i);
+
+        double dist = DIST_TABLE[nid][ship->sid];
+
+        if (minDist > dist) {
+          minDist = dist;
+          fid = i;
+        }
+      }
+
+      if (fid == g_flagShipId) {
+        flagShip->sid = nid;
+      } else {
+        changeFlagShip(fid);
+        Ship *newFlagShip = getShip(g_flagShipId);
+        newFlagShip->sid = nid;
       }
     }
 
@@ -329,10 +469,7 @@ class StarTraveller {
 
             if (ufo->capacity <= ufo->crew) continue; 
 
-            Star *from = getStar(ufo->nid);
-            Star *to = getStar(ship->sid);
-
-            double dist = calcDist(from->y, from->x, to->y, to->x);
+            double dist = DIST_TABLE[ufo->nid][ship->sid];
 
             if (minDist > dist) {
               minDist = dist;
@@ -363,7 +500,7 @@ class StarTraveller {
       }
 
       double minScore = calcPathDist();
-      
+
       ll startCycle = getCycle();
       double currentTime;
       ll tryCount = 0;
@@ -385,11 +522,17 @@ class StarTraveller {
 
         type = xor128()%2;
 
-        if (type == 0) {
-          reconnectPath(c1, c2);
-        } else {
-          swapStar(c1, c2);
+        switch(type) {
+          case 0:
+            reconnectPath(c1, c2);
+            break;
+          case 1:
+            swapStar(c1, c2);
+            break;
+          default:
+            break;
         }
+
         double newScore = calcPathDist();
         //double newScore = calcSubDist(c1, c2);
         double scoreDiff = baseScore - newScore;
@@ -397,7 +540,7 @@ class StarTraveller {
         if (minScore > newScore) {
           minScore = newScore;
           bestPath = g_path;
-        } else if (T > 0.0 && xor128()%100 < 100 * exp(scoreDiff/(k*T))) {
+        } else if (false && T > 0.0 && xor128()%100 < 100 * exp(scoreDiff/(k*T))) {
         } else {
           //g_path = bestPath;
 
@@ -408,19 +551,20 @@ class StarTraveller {
           }
         }
 
-        currentTime = getTime(startCycle);
+        if (tryCount % 100 == 0) {
+          currentTime = getTime(startCycle);
 
-        if (currentTime > TIME_LIMIT) {
-          break;
+          if (currentTime > TIME_LIMIT) {
+            break;
+          }
         }
 
         T *= alpha;
       }
 
       fprintf(stderr,"tryCount = %lld\n", tryCount);
-      double pathDist = calcPathDist();
       //double pathDist = sqrt(calcPathDist());
-      fprintf(stderr,"path size = %d, pathDist = %f\n", g_psize, pathDist);
+      fprintf(stderr,"path size = %d, pathDist = %f\n", g_psize, minScore);
 
       return bestPath;
     }
@@ -439,9 +583,13 @@ class StarTraveller {
     }
 
     void reconnectPath(int c1, int c3) {
-      int c2 = (c1+1)%g_psize;
-      int i = c2;
+      int i = c1;
       int j = c3;
+
+      if (c1 > c3) {
+        i = c3;
+        j = c1;
+      }
 
       while(i < j) {
         int temp = g_path[i];
@@ -479,12 +627,11 @@ class StarTraveller {
     }
 
     double calcPathDist() {
-      int psize = g_path.size();
       double totalDist = 0;
 
-      for (int i = 0; i < psize; i++) {
+      for (int i = 0; i < g_psize; i++) {
         int s1 = g_path[i];
-        int s2 = g_path[(i+1)%psize];
+        int s2 = g_path[(i+1)%g_psize];
 
         double dist = DIST_TABLE[s1][s2];
 
