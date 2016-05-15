@@ -479,38 +479,6 @@ class StarTraveller {
       return d1 + d2 + d3 + d4;
     }
 
-    double calcDiffDist(int c1, int c2) {
-      int s1b = (c1 == 0)? g_path[g_psize-1] : g_path[c1-1];
-      int s1m = g_path[c1];
-      int s1a = g_path[(c1+1)%g_psize];
-
-      int s2b = (c2 == 0)? g_path[g_psize-1] : g_path[c2-1];
-      int s2m = g_path[c2];
-      int s2a = g_path[(c2+1)%g_psize];
-
-      Star *star1 = getStar(s1b);
-      Star *star2 = getStar(s1m);
-      Star *star3 = getStar(s1a);
-
-      Star *star4 = getStar(s2b);
-      Star *star5 = getStar(s2m);
-      Star *star6 = getStar(s2a);
-
-      double d1 = DIST_TABLE[s1b][s1m];
-      double d2 = DIST_TABLE[s1m][s1a];
-      double d3 = DIST_TABLE[s2b][s2m];
-      double d4 = DIST_TABLE[s2m][s2a];
-      double baseDist = d1 + d2 + d3 + d4;
-
-      double d5 = calcDist(star1->y, star1->x, star5->y, star5->x);
-      double d6 = calcDist(star5->y, star5->x, star3->y, star3->x);
-      double d7 = calcDist(star4->y, star4->x, star2->y, star2->x);
-      double d8 = calcDist(star2->y, star2->x, star6->y, star6->x);
-      double newDist = d5 + d6 + d7 + d8;
-
-      return (baseDist - newDist);
-    }
-
     ll calcPathDist() {
       int psize = g_path.size();
       ll totalDist = 0;
