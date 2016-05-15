@@ -23,18 +23,13 @@ const int MAX_UFO = 20;
 const ll CYCLE_PER_SEC = 2400000000;
 double TIME_LIMIT = 15.0;
 
+double DIST_TABLE[MAX_STAR][MAX_STAR];
+
 unsigned long long xor128(){
   static unsigned long long rx=123456789, ry=362436069, rz=521288629, rw=88675123;
   unsigned long long rt = (rx ^ (rx<<11));
   rx=ry; ry=rz; rz=rw;
   return (rw=(rw^(rw>>19))^(rt^(rt>>8)));
-}
-
-ll getTimeOld() {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  ll result =  tv.tv_sec * 1000LL + tv.tv_usec / 1000LL;
-  return result;
 }
 
 unsigned long long int getCycle() {
@@ -151,31 +146,36 @@ class StarTraveller {
       g_remainCount = g_starCount;
       g_checkFlag = false;
       g_flag = false;
-      int maxH = 0;
-      int minH = 1024;
-      int maxW = 0;
-      int minW = 1024;
       vector<int> path;
 
       for (int i = 0; i < g_starCount; i++) {
         int x = stars[i*2];
         int y = stars[i*2+1];
 
-        maxH = max(maxH, y);
-        minH = min(minH, y);
-        maxW = max(maxW, x);
-        minW = min(minW, x);
-
         g_starList.push_back(Star(y,x));
         path.push_back(i);
       }
 
-      fprintf(stderr,"maxW = %d, minW = %d, maxH = %d, minH = %d\n", maxW, minW, maxH, minH);
+      setupDistTable();
 
       //g_path = TSPSolver(path);
       kmeans();
 
       return 0;
+    }
+
+    void setupDistTable() {
+      for (int i = 0; i < g_starCount-1; i++) {
+        Star *from = getStar(i);
+
+        for (int j = i+1; j < g_starCount; j++) {
+          Star *to = getStar(j);
+          double dist = calcDist(from->y, from->x, to->y, to->x);
+
+          DIST_TABLE[i][j] = dist;
+          DIST_TABLE[j][i] = dist;
+        }
+      }
     }
 
     void setParameter() {
@@ -206,9 +206,8 @@ class StarTraveller {
         ufo->cid = ufos[i*3];
         ufo->nid = ufos[i*3+1];
         Star *star = getStar(ufo->cid);
-        Star *nstar = getStar(ufo->nid);
 
-        double dist = calcDist(star->y, star->x, nstar->y, nstar->x);
+        double dist = DIST_TABLE[ufo->cid][ufo->nid];
 
         if (!star->visited) {
           ufo->hitCount++;
@@ -254,42 +253,11 @@ class StarTraveller {
         } else if (g_flag) {
           moveShip(ships);
           break;
-          /*
-          if (i == 0) {
-            ship->sid = g_path[g_index];
-            g_index++;
-          } else {
-            ship->sid = ships[i];
-          }
-          */
         } else {
           moveShipWithUFO(ufos, ships);
-
-          /*
-          if (i < g_ufoCount) {
-            ship->uid = i;
-            ship->sid = ufos[i*3+1];
-          } else {
-            ship->sid = ships[i];
-          }
-          */
+          break;
         }
       }
-
-      /*
-      for (int i = 0;i < g_starCount; i++) {
-        if (!used[i]) {
-          used[i] = 1;
-          ret.push_back(i);
-          if (ret.size() == ships.size()) break;
-        }
-      }
-
-      // Make sure the return is filled with valid moves for the final move.
-      while (ret.size() < ships.size()) {
-        ret.push_back((ships[ret.size()]+1)%g_starCount);
-      }
-      */
 
       vector<int> ret = getOutput();
       return ret;
@@ -312,13 +280,11 @@ class StarTraveller {
       g_index++;
       double minDist = DBL_MAX;
       int moveId = -1;
-      Star *ts = getStar(target);
 
       for (int i = 0; i < g_shipCount; i++) {
         Ship *ship = getShip(i);
-        Star *star = getStar(ship->sid);
         
-        double dist = calcDist(star->y, star->x, ts->y, ts->x);
+        double dist = DIST_TABLE[ship->sid][target];
 
         if (minDist > dist) {
           minDist = dist;
@@ -399,7 +365,6 @@ class StarTraveller {
       double k = 10.0;
       double alpha = 0.999;
       int type;
-      ll startTime = getTimeOld();
 
       while(1) {
         tryCount++;
@@ -444,23 +409,11 @@ class StarTraveller {
           }
         }
 
-        ll cycle = getCycle();
         currentTime = getTime(startCycle);
 
         if (currentTime > TIME_LIMIT) {
           break;
         }
-
-        /*
-        if (tryCount % 100 == 0) {
-          ll ctime = getTimeOld() - startTime;
-
-          if (ctime > 990) {
-            fprintf(stderr,"cycle = %lld\n", cycle - startCycle);
-            break;
-          }
-        }
-        */
 
         T *= alpha;
       }
@@ -543,10 +496,10 @@ class StarTraveller {
       Star *star5 = getStar(s2m);
       Star *star6 = getStar(s2a);
 
-      double d1 = calcDist(star1->y, star1->x, star2->y, star2->x);
-      double d2 = calcDist(star2->y, star2->x, star3->y, star3->x);
-      double d3 = calcDist(star4->y, star4->x, star5->y, star5->x);
-      double d4 = calcDist(star5->y, star5->x, star6->y, star6->x);
+      double d1 = DIST_TABLE[s1b][s1m];
+      double d2 = DIST_TABLE[s1m][s1a];
+      double d3 = DIST_TABLE[s2b][s2m];
+      double d4 = DIST_TABLE[s2m][s2a];
       double baseDist = d1 + d2 + d3 + d4;
 
       double d5 = calcDist(star1->y, star1->x, star5->y, star5->x);
@@ -554,16 +507,6 @@ class StarTraveller {
       double d7 = calcDist(star4->y, star4->x, star2->y, star2->x);
       double d8 = calcDist(star2->y, star2->x, star6->y, star6->x);
       double newDist = d5 + d6 + d7 + d8;
-
-      /*
-      if (baseDist > newDist) {
-        fprintf(stderr,"(%d -> %d -> %d) = %f, (%d -> %d -> %d) = %f\n",
-            s1b, s1m, s1a, (d1+d2), s2b, s2m, s2a, (d3+d4));
-        fprintf(stderr,"(%d -> %d -> %d) = %f, (%d -> %d -> %d) = %f\n",
-            s1b, s2m, s1a, (d5+d6), s2b, s1m, s2a, (d7+d8));
-        fprintf(stderr,"baseDist = %f, newDist = %f\n", baseDist, newDist);
-      }
-      */
 
       return (baseDist - newDist);
     }
@@ -576,15 +519,9 @@ class StarTraveller {
         int s1 = g_path[i];
         int s2 = g_path[(i+1)%psize];
 
-        Star *star1 = getStar(s1);
-        Star *star2 = getStar(s2);
+        double dist = DIST_TABLE[s1][s2];
 
-        int dist = calcDistFast(star1->y, star1->x, star2->y, star2->x);
-        double dd = sqrt(dist);
-
-        //fprintf(stderr,"%d -> %d = %4.2f\n", s1, s2, dd);
-
-        totalDist += dd;
+        totalDist += dist;
       }
 
       return totalDist;
@@ -595,7 +532,7 @@ class StarTraveller {
         g_galaxyCount = i;
 
         for (int j = 0; j < 5; j++) {
-          setRandomGalaxy(i);
+          setRandomGalaxy();
 
           while(updateCluster()) {
             changeGalaxyPoint();
@@ -643,7 +580,7 @@ class StarTraveller {
       return true;
     }
 
-    void setRandomGalaxy(int n) {
+    void setRandomGalaxy() {
       //fprintf(stderr,"%d: setRandomGalaxy =>\n", n);
       for (int i = 0; i < g_galaxyCount; i++) {
         int gy = xor128()%SPACE_SIZE;
