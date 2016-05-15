@@ -219,7 +219,7 @@ class StarTraveller {
         //fprintf(stderr,"UFO %d: hitRate = %f\n", i, ufo->hitRate());
       }
 
-      if (!g_flag && g_remainCount >= g_timeLimit) {
+      if (!g_flag && g_remainCount > g_timeLimit) {
         g_flag = true;
         fprintf(stderr,"remain count = %d\n", g_remainCount);
       }
@@ -276,19 +276,26 @@ class StarTraveller {
     }
 
     void moveShip(vector<int> &ships) {
-      int target = g_path[g_index];
-      g_index++;
       double minDist = DBL_MAX;
       int moveId = -1;
+      int targetId = -1;
 
       for (int i = 0; i < g_shipCount; i++) {
         Ship *ship = getShip(i);
         
-        double dist = DIST_TABLE[ship->sid][target];
+        for (int j = 0; j < g_psize; j++) {
+          int target = g_path[j];
+          Star *star = getStar(target);
 
-        if (minDist > dist) {
-          minDist = dist;
-          moveId = i;
+          if (star->visited) continue;
+
+          double dist = DIST_TABLE[ship->sid][target];
+
+          if (minDist > dist) {
+            minDist = dist;
+            moveId = i;
+            targetId = target;
+          }
         }
       }
 
@@ -296,7 +303,7 @@ class StarTraveller {
         Ship *ship = getShip(i);
 
         if (i == moveId) {
-          ship->sid = target;
+          ship->sid = targetId;
         } else {
           ship->sid = ships[i];
         }
@@ -387,22 +394,14 @@ class StarTraveller {
         //double newScore = calcSubDist(c1, c2);
         double scoreDiff = baseScore - newScore;
 
-        if (scoreDiff > 0.0) {
+        if (minScore > newScore) {
+          minScore = newScore;
           bestPath = g_path;
-
-          double dist = calcPathDist();
-          /*
-          fprintf(stderr,"swap %d <-> %d\n", g_path[c1], g_path[c2]);
-          fprintf(stderr,"score = %f, %f -> %f\n", score, minScore, dist);
-          */
-          //assert(minScore > dist);
-          minScore = dist;
         } else if (T > 0.0 && xor128()%100 < 100 * exp(scoreDiff/(k*T))) {
         } else {
           //g_path = bestPath;
 
           if (type == 0) {
-            //g_path = bestPath;
             reconnectPath(c1, c2);
           } else {
             swapStar(c1, c2);
@@ -479,9 +478,9 @@ class StarTraveller {
       return d1 + d2 + d3 + d4;
     }
 
-    ll calcPathDist() {
+    double calcPathDist() {
       int psize = g_path.size();
-      ll totalDist = 0;
+      double totalDist = 0;
 
       for (int i = 0; i < psize; i++) {
         int s1 = g_path[i];
