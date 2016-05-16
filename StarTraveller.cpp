@@ -495,7 +495,7 @@ class StarTraveller {
       double currentTime;
       ll tryCount = 0;
 
-      double T = 10000.0;
+      double T = 1000.0;
       double k = 10.0;
       double alpha = 0.999;
       int type;
@@ -507,7 +507,7 @@ class StarTraveller {
           c2 = xor128() % g_psize;
         } while (c1 == c2);
 
-        type = xor128()%3;
+        type = xor128()%4;
 
         switch(type) {
           case 0:
@@ -518,6 +518,9 @@ class StarTraveller {
             break;
           case 2:
             insertStar(c1, c2);
+            break;
+          case 3:
+            insertStar2(c1, c2);
             break;
           default:
             reconnectPath(c1, c2);
@@ -545,6 +548,9 @@ class StarTraveller {
               swapStar(c1, c2);
               break;
             case 2:
+              g_path = bestPath;
+              break;
+            case 3:
               g_path = bestPath;
               break;
             default:
@@ -588,6 +594,18 @@ class StarTraveller {
 
       g_path.erase(g_path.begin()+c1);
       g_path.insert(g_path.begin()+c2, temp);
+    }
+
+    void insertStar2(int c1, int c2) {
+      if (c1 > g_psize-3 || c2 > g_psize-3) return;
+
+      int temp = g_path[c1];
+      int temp2 = g_path[c1+1];
+
+      g_path.erase(g_path.begin()+c1);
+      g_path.erase(g_path.begin()+c1);
+      g_path.insert(g_path.begin()+c2, temp);
+      g_path.insert(g_path.begin()+c2, temp2);
     }
 
     void reconnectPath(int c1, int c3) {
