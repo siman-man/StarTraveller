@@ -184,7 +184,7 @@ class StarTraveller {
 
     void setParameter() {
       if (g_turn <= g_starCount) {
-        g_changeLine = 100;
+        g_changeLine = 64;
       } else {
         g_changeLine = 256;
       }
@@ -534,7 +534,7 @@ class StarTraveller {
 
         if (goodScore > newScore) {
           goodScore = newScore;
-        } else if (xor128()%100 < 100 * exp(scoreDiff/(k*T))) {
+        } else if (xor128()%100 < 100*exp(scoreDiff/(k*T))) {
           goodScore = newScore;
         } else {
           switch (type) {
