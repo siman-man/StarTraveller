@@ -37,11 +37,12 @@ Your task is to minimize the total energy used by your ships in order to visit e
 
 - [ ] UFOの動きはランダムなのか
 - [ ] UFOは平均してどの程度星を訪れることができるのか
+- [ ] Multiple Traveling Salesman Problemについて調べる
 
 ### 調査結果
 
 - [x] UFOの動きはランダム
-- [ ] 停滞行動はあり
+- [x] 停滞行動は可能
 
 ## 問題を理解する
 
@@ -56,7 +57,7 @@ Your task is to minimize the total energy used by your ships in order to visit e
 * 星の座標 (100 - 2000個)
 * UFOの2ターン後までの行動
 * 星の集まりである銀河がいくつか定義されている (1 - 16個)
-* 星は銀河を中心とした±100の位置に属する
+* 星は銀河を中心とした±300の位置に属する
 
 * UFOの移動候補は10 + rnd(NStar/10);
   * かならず1マス以上動く
@@ -72,6 +73,7 @@ Your task is to minimize the total energy used by your ships in order to visit e
 ### 似たような問題はあるか
 
 * 巡回セールスマン問題
+* Multiple Traveling Salesman Problem
 
 ## 考察
 

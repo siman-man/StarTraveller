@@ -192,7 +192,6 @@ class StarTraveller {
 
     void directFlagShip() {
       double minDist = DBL_MAX;
-      int targetId = -1;
       int index = -1;
 
       for (int i = 0; i < g_shipCount; i++) {
@@ -209,7 +208,6 @@ class StarTraveller {
           if (minDist > dist) {
             minDist = dist;
             g_flagShipId = i;
-            targetId = target;
             index = j;
           }
         }
@@ -434,8 +432,6 @@ class StarTraveller {
         if (ufo->capacity <= ufo->crew) continue; 
 
         double minDist = DBL_MAX;
-        int uid = -1;
-        int nid = -1;
         int shipId = -1;
 
         for (int i = 0; i < g_shipCount; i++) {
@@ -447,18 +443,21 @@ class StarTraveller {
 
           if (minDist > dist) {
             minDist = dist;
-            nid = ufo->nid;
-            uid = j;
             shipId = i;
           }
         }
 
         Ship *ship = getShip(shipId);
+        Star *star = getStar(ufo->nid);
 
         if (minDist <= g_changeLine) {
-          ship->sid = nid;
-          ship->uid = uid;
-          g_ufoList[uid].crew++;
+          double ndist = DIST_TABLE[ship->sid][ufo->nnid];
+
+          if (!star->visited || minDist < ndist) {
+            ship->sid = ufo->nid;
+            ship->uid = j;
+            g_ufoList[j].crew++;
+          }
         }
       }
 
@@ -566,7 +565,6 @@ class StarTraveller {
       }
 
       fprintf(stderr,"tryCount = %lld\n", tryCount);
-      //double pathDist = sqrt(calcPathDist());
       fprintf(stderr,"path size = %d, pathDist = %f\n", g_psize, bestScore);
 
       return bestPath;
