@@ -522,9 +522,6 @@ class StarTraveller {
           case 3:
             insertStar2(c1, c2);
             break;
-          default:
-            reconnectPath(c1, c2);
-            break;
         }
 
         double newScore = calcPathDist();
@@ -552,9 +549,6 @@ class StarTraveller {
               break;
             case 3:
               g_path = bestPath;
-              break;
-            default:
-              reconnectPath(c1, c2);
               break;
           }
         }
