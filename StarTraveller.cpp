@@ -23,6 +23,7 @@ const int MAX_SHIP = 10;
 const int MAX_UFO = 20;
 const ll CYCLE_PER_SEC = 2400000000;
 double TIME_LIMIT = 15.0;
+double FIRST_TIME_LIMIT = 3.0;
 
 double DIST_TABLE[MAX_STAR][MAX_STAR];
 
@@ -309,9 +310,7 @@ class StarTraveller {
         }
 
         g_psize = path.size();
-        double FIRST_TIME_LIMIT = 1.0;
         ll startCycle = getCycle();
-        double currentTime;
         double minDist = DBL_MAX;
         vector<int> firstPath;
 
@@ -523,13 +522,18 @@ class StarTraveller {
       int type;
 
       while(1) {
-        tryCount++;
         do {
           c1 = xor128() % g_psize;
           c2 = xor128() % g_psize;
         } while (c1 == c2);
 
         type = xor128()%4;
+
+        if (type == 3 && (c1 > g_psize-3 || c2 > g_psize-3)) {
+          continue;
+        }
+
+        tryCount++;
 
         switch(type) {
           case 0:
@@ -613,8 +617,6 @@ class StarTraveller {
     }
 
     void insertStar2(int c1, int c2) {
-      if (c1 > g_psize-3 || c2 > g_psize-3) return;
-
       int temp = g_path[c1];
       int temp2 = g_path[c1+1];
 
@@ -690,6 +692,7 @@ class StarTraveller {
 template<class T> void getVector(vector<T>& v) { for (int i = 0; i < v.size(); ++i) cin >> v[i];}
 int main() {
   TIME_LIMIT = 5.0;
+  FIRST_TIME_LIMIT = 1.0;
   int NStars; cin >> NStars; vector<int> stars(NStars);
   getVector(stars); StarTraveller algo;
   int ignore = algo.init(stars);
