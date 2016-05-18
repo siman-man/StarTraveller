@@ -308,7 +308,29 @@ class StarTraveller {
           }
         }
 
-        vector<int> firstPath = createFirstPath(path);
+        g_psize = path.size();
+        double FIRST_TIME_LIMIT = 1.0;
+        ll startCycle = getCycle();
+        double currentTime;
+        double minDist = DBL_MAX;
+        vector<int> firstPath;
+
+        for (int i = 0; i < g_psize; i++) {
+          g_path = createFirstPath(path, i);
+          double dist = calcPathDist();
+
+          if (minDist > dist) {
+            minDist = dist;
+            firstPath = g_path;
+          }
+
+          double currentTime = getTime(startCycle);
+
+          if (currentTime > FIRST_TIME_LIMIT) {
+            break;
+          }
+        }
+
         g_path = TSPSolver(firstPath);
         directFlagShip();
       }
@@ -335,11 +357,11 @@ class StarTraveller {
       return ret;
     }
 
-    vector<int> createFirstPath(vector<int> &path) {
+    vector<int> createFirstPath(vector<int> &path, int index) {
       map<int, bool> checkList;
       vector<int> ret;
       int psize = path.size();
-      int cid = path[0];
+      int cid = path[index];
       int nid;
       ret.push_back(cid);
 
