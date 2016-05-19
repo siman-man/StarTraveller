@@ -21,9 +21,10 @@ const int MAX_STAR = 2000;
 const int MAX_GALAXY = 16;
 const int MAX_SHIP = 10;
 const int MAX_UFO = 20;
+const int WARNING_LINE = 30;
 const ll CYCLE_PER_SEC = 2400000000;
-double TIME_LIMIT = 15.0;
-double FIRST_TIME_LIMIT = 3.0;
+double TIME_LIMIT = 6.0;
+double FIRST_TIME_LIMIT = 5.0;
 
 double DIST_TABLE[MAX_STAR][MAX_STAR];
 
@@ -53,16 +54,20 @@ inline int calcDistFast(int y1, int x1, int y2, int x2) {
 }
 
 struct Star {
+  int id;
   int y;
   int x;
-  int gid;
+  int visitedCount;
   bool visited;
+  double minDist;
 
-  Star (int y = -1, int x = -1) {
+  Star (int id = -1, int y = -1, int x = -1) {
+    this->id = id;
     this->y = y;
     this->x = x;
-    this->gid = -1;
+    this->visitedCount = 0;
     this->visited = false;
+    this->minDist = 0.0;
   }
 };
 
@@ -88,6 +93,7 @@ struct UFO {
   int hitCount;
   int totalCount;
   double totalMoveDist;
+  map<int, bool> visitedList;
 
   UFO () {
     this->crew = 0;
@@ -124,7 +130,9 @@ Ship g_shipList[MAX_SHIP];
 UFO g_ufoList[MAX_UFO];
 Galaxy g_galaxyList[MAX_GALAXY];
 vector<int> g_path;
+vector<int> g_unvisitedStars;
 int g_psize;
+int g_usize;
 
 int g_turn;
 int g_index;
@@ -139,6 +147,9 @@ int g_flagShipId;
 int g_noupdate;
 bool g_flag;
 bool g_checkFlag;
+bool g_lastFlag;
+bool g_warning;
+bool g_createFlag;
 
 class StarTraveller {
   public:
@@ -152,6 +163,8 @@ class StarTraveller {
       g_timeLimit = g_starCount * 4;
       g_remainCount = g_starCount;
       g_checkFlag = false;
+      g_lastFlag = false;
+      g_createFlag = false;
       g_flag = false;
       g_noupdate = 0;
       vector<int> path;
@@ -160,7 +173,7 @@ class StarTraveller {
         int x = stars[i*2];
         int y = stars[i*2+1];
 
-        g_starList.push_back(Star(y,x));
+        g_starList.push_back(Star(i, y,x));
         path.push_back(i);
       }
 
@@ -190,6 +203,56 @@ class StarTraveller {
         g_changeLine = 256;
       }
     } 
+
+    void gotoNearStar() {
+      map<int, bool> shipCheckList;
+
+      for (int i = 0; i < g_usize; i++) {
+        Star *star = getStar(g_unvisitedStars[i]);
+        double minDist = star->minDist - 30;
+        int minId = -1;
+
+        for (int j = 0; j < g_shipCount; j++) {
+          Ship *ship = getShip(j);
+          if (shipCheckList[j]) continue;
+
+          double dist = DIST_TABLE[ship->sid][star->id];
+
+          if (minDist > dist) {
+            minDist = dist;
+            minId = j;
+          }
+        }
+
+        if (minId >= 0) {
+          Ship *ship = getShip(minId);
+          shipCheckList[minId] = true;
+
+          if (ship->uid >= 0) {
+            UFO *ufo = getUFO(ship->uid);
+            Star *nstar = getStar(ufo->nid);
+
+            if (minDist < DIST_TABLE[nstar->id][star->id]) {
+              fprintf(stderr,"jump %d -> %d, dist = %f\n", ship->sid, star->id, minDist);
+              ship->sid = star->id;
+              ship->uid = -1;
+            }
+          } else {
+            fprintf(stderr,"jump %d -> %d, dist = %f\n", ship->sid, star->id, minDist);
+            ship->sid = star->id;
+            ship->uid = -1;
+          }
+        }
+      }
+
+      for (int j = 0; j < g_shipCount; j++) {
+        Ship *ship = getShip(j);
+        if (ship->uid < 0 || shipCheckList[j]) continue;
+
+        UFO *ufo = getUFO(ship->uid);
+        ship->sid = ufo->nid;
+      }
+    }
 
     void directFlagShip() {
       double minDist = DBL_MAX;
@@ -260,7 +323,6 @@ class StarTraveller {
 
       g_ufoCount = ufos.size() / 3;
       g_shipCount = ships.size();
-      int ssize = ships.size();
 
       if (g_turn > 1) {
         if (checkVisited(ships)) {
@@ -270,90 +332,74 @@ class StarTraveller {
         }
       }
 
+      g_unvisitedStars = getUnvisitedStars();
+      g_usize = g_unvisitedStars.size();
       setParameter();
+      updateUFOInfo(ufos);
 
-      for (int i = 0; i < g_ufoCount; i++) {
-        UFO *ufo = getUFO(i);
-
-        ufo->sid = ufos[i*3];
-        ufo->nid = ufos[i*3+1];
-        ufo->nnid = ufos[i*3+2];
-        Star *star = getStar(ufo->sid);
-
-        double dist = DIST_TABLE[ufo->sid][ufo->nid];
-
-        if (!star->visited) {
-          ufo->hitCount++;
-        }
-
-        ufo->totalMoveDist += dist;
-        ufo->totalCount++;
-
-        //fprintf(stderr,"UFO %d: hitRate = %f\n", i, ufo->hitRate());
-      }
-
-      if (!g_flag && g_remainCount > g_timeLimit) {
+      if (!g_flag && g_remainCount > g_timeLimit-1) {
         g_flag = true;
         fprintf(stderr,"remain count = %d\n", g_remainCount);
       }
 
+      g_warning = (g_remainCount > g_timeLimit - WARNING_LINE);
+
+      if (!g_createFlag && g_warning) {
+        g_createFlag = true;
+        createPath();
+
+        for (int i = 0; i < g_usize; i++) {
+          Star *star = getStar(g_unvisitedStars[i]);
+          star->minDist = getNearStarDist(star->id);
+
+          if (star->minDist >= 100.0) {
+            fprintf(stderr,"star %d: isolated %f\n", star->id, star->minDist);
+          }
+        }
+      }
+
       if (g_flag && !g_checkFlag) {
-        vector<int> path;
         g_checkFlag = true;
-
-        for (int i = 0; i < g_starCount; i++) {
-          Star *star = getStar(i);
-
-          if (!star->visited) {
-            path.push_back(i);
-          }
-        }
-
-        g_psize = path.size();
-        ll startCycle = getCycle();
-        double minDist = DBL_MAX;
-        vector<int> firstPath;
-
-        for (int i = 0; i < g_psize; i++) {
-          g_path = createFirstPath(path, i);
-          double dist = calcPathDist();
-
-          if (minDist > dist) {
-            minDist = dist;
-            firstPath = g_path;
-          }
-
-          double currentTime = getTime(startCycle);
-
-          if (currentTime > FIRST_TIME_LIMIT) {
-            break;
-          }
-        }
-
-        g_path = TSPSolver(firstPath);
+        createLastPath();
         directFlagShip();
       }
 
-      for (int i = 0; i < ssize; i++) {
-        Ship *ship = getShip(i);
-
-        if (g_turn == 1) {
-          ship->sid = ships[i];
-        } else if (g_flag) {
-          if (g_shipCount <= 1) {
-            moveShipSingle();
-          } else {
-            moveShip();
-          }
-          break;
+      if (g_turn == 1) {
+        moveShipFirst(ships);
+      } else if (g_flag) {
+        if (g_shipCount <= 1) {
+          moveShipSingle();
+        } else if (false && !g_lastFlag) {
+          gotoNearStar();
+          g_lastFlag = true;
         } else {
-          moveShipWithUFO();
-          break;
+          moveShip();
         }
+      } else if (g_warning) {
+        gotoNearStar();
+      } else {
+        moveShipWithUFO();
       }
+
 
       vector<int> ret = getOutput();
       return ret;
+    }
+
+    int findStar(int sid) {
+      return (find(g_path.begin(), g_path.end(), sid) - g_path.begin());
+    }
+
+    double getNearStarDist(int sid) {
+      int index = findStar(sid);
+      int bid = (index == 0)? g_path[g_psize-1] : g_path[index-1];
+      int aid = g_path[(index+1)%g_psize];
+
+      double d1 = DIST_TABLE[bid][sid];
+      double d2 = DIST_TABLE[sid][aid];
+      double d3 = DIST_TABLE[aid][bid];
+
+      return (d1 + d2 - d3);
     }
 
     vector<int> createFirstPath(vector<int> &path, int index) {
@@ -388,6 +434,77 @@ class StarTraveller {
       return ret;
     }
 
+    vector<int> getUnvisitedStars() {
+      vector<int> stars;
+
+      for (int i = 0; i < g_starCount; i++) {
+        Star *star = getStar(i);
+
+        if (!star->visited) {
+          stars.push_back(i);
+        }
+      }
+
+      return stars;
+    }
+
+    void createPath() {
+      vector<int> path = getUnvisitedStars();
+      g_psize = path.size();
+
+      vector<int> firstPath = createFirstPath(path, 0);
+      g_path = TSPSolver(firstPath);
+    }
+
+    void createLastPath() {
+      vector<int> path = getUnvisitedStars();
+      g_psize = path.size();
+
+      ll startCycle = getCycle();
+      double minDist = DBL_MAX;
+      vector<int> firstPath;
+
+      for (int i = 0; i < g_psize; i++) {
+        g_path = createFirstPath(path, i);
+        double dist = calcPathDist();
+
+        if (minDist > dist) {
+          minDist = dist;
+          firstPath = g_path;
+        }
+
+        double currentTime = getTime(startCycle);
+
+        if (currentTime > FIRST_TIME_LIMIT) {
+          break;
+        }
+      }
+
+      g_path = TSPSolver(firstPath);
+    }
+
+    void updateUFOInfo(vector<int> &ufos) {
+      for (int i = 0; i < g_ufoCount; i++) {
+        UFO *ufo = getUFO(i);
+
+        ufo->sid = ufos[i*3];
+        ufo->nid = ufos[i*3+1];
+        ufo->nnid = ufos[i*3+2];
+        Star *star = getStar(ufo->sid);
+        star->visitedCount++;
+
+        double dist = DIST_TABLE[ufo->sid][ufo->nid];
+
+        if (!ufo->visitedList[ufo->sid]) {
+          ufo->visitedList[ufo->sid] = true;
+          ufo->hitCount++;
+        }
+
+        ufo->totalMoveDist += dist;
+        ufo->totalCount++;
+      }
+    }
+
     bool checkVisited(vector<int> &ships) {
       bool update = false;
 
@@ -403,6 +520,13 @@ class StarTraveller {
       }
 
       return update;
+    }
+
+    void moveShipFirst(vector<int> &ships) {
+      for (int i = 0; i < g_shipCount; i++) {
+        Ship *ship = getShip(i);
+        ship->sid = ships[i];
+      }
     }
 
     void moveShipSingle() {
@@ -433,6 +557,16 @@ class StarTraveller {
           minDist = dist;
           fid = i;
         }
+
+        if (g_flagShipId != i && ship->uid >= 0) {
+          UFO *ufo = getUFO(ship->uid);
+          Star *nstar = getStar(ufo->nid);
+          Star *nnstar = getStar(ufo->nnid);
+
+          if (ship->sid == ufo->sid && (!nstar->visited || !nnstar->visited)) {
+            ship->sid = ufo->nid;
+          }
+        }
       }
 
       if (fid == g_flagShipId) {
@@ -449,6 +583,8 @@ class StarTraveller {
 
       for (int j = 0; j < g_ufoCount; j++) {
         UFO *ufo = getUFO(j);
+        Star *nstar = getStar(ufo->nid);
+        Star *nnstar = getStar(ufo->nnid);
 
         if (ufo->capacity <= ufo->crew) continue; 
 
@@ -457,10 +593,22 @@ class StarTraveller {
 
         for (int i = 0; i < g_shipCount; i++) {
           Ship *ship = getShip(i);
-
-          if (ship->uid >= 0) continue;
-
           double dist = DIST_TABLE[ufo->nid][ship->sid];
+
+          if (ship->uid >= 0) {
+            UFO *mfo = getUFO(ship->uid);
+            Star *onstar = getStar(ufo->nid);
+            Star *onnstar = getStar(ufo->nnid);
+
+            if (ship->sid == ufo->sid && onstar->visited && onnstar->visited && mfo->hitCount < ufo->hitCount) {
+              ship->uid = j;
+              ufo->crew++;
+              mfo->crew--;
+            }
+
+            continue;
+          }
+
 
           if (minDist > dist) {
             minDist = dist;
@@ -469,12 +617,11 @@ class StarTraveller {
         }
 
         Ship *ship = getShip(shipId);
-        Star *star = getStar(ufo->nid);
 
         if (minDist <= g_changeLine) {
           double ndist = DIST_TABLE[ship->sid][ufo->nnid];
 
-          if (!star->visited || minDist < ndist) {
+          if (!nstar->visited || minDist < ndist) {
             ship->sid = ufo->nid;
             ship->uid = j;
             g_ufoList[j].crew++;
@@ -691,7 +838,7 @@ class StarTraveller {
 // -------8<------- end of solution submitted to the website -------8<-------
 template<class T> void getVector(vector<T>& v) { for (int i = 0; i < v.size(); ++i) cin >> v[i];}
 int main() {
-  TIME_LIMIT = 5.0;
+  TIME_LIMIT = 2.5;
   FIRST_TIME_LIMIT = 1.0;
   int NStars; cin >> NStars; vector<int> stars(NStars);
   getVector(stars); StarTraveller algo;
