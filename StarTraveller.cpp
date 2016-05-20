@@ -258,7 +258,6 @@ class StarTraveller {
 
       g_ufoCount = ufos.size() / 3;
       g_shipCount = ships.size();
-      int ssize = ships.size();
 
       if (g_turn > 1) {
         if (checkVisited(ships)) {
@@ -269,26 +268,7 @@ class StarTraveller {
       }
 
       setParameter();
-
-      for (int i = 0; i < g_ufoCount; i++) {
-        UFO *ufo = getUFO(i);
-
-        ufo->sid = ufos[i*3];
-        ufo->nid = ufos[i*3+1];
-        ufo->nnid = ufos[i*3+2];
-        Star *star = getStar(ufo->sid);
-
-        double dist = DIST_TABLE[ufo->sid][ufo->nid];
-
-        if (!star->visited) {
-          ufo->hitCount++;
-        }
-
-        ufo->totalMoveDist += dist;
-        ufo->totalCount++;
-
-        //fprintf(stderr,"UFO %d: hitRate = %f\n", i, ufo->hitRate());
-      }
+      updateUFOInfo(ufos);
 
       if (!g_flag && g_remainCount > g_timeLimit) {
         g_flag = true;
@@ -395,6 +375,26 @@ class StarTraveller {
       }
 
       return update;
+    }
+
+    void updateUFOInfo(vector<int> ufos) {
+      for (int i = 0; i < g_ufoCount; i++) {
+        UFO *ufo = getUFO(i);
+
+        ufo->sid = ufos[i*3];
+        ufo->nid = ufos[i*3+1];
+        ufo->nnid = ufos[i*3+2];
+        Star *star = getStar(ufo->sid);
+
+        double dist = DIST_TABLE[ufo->sid][ufo->nid];
+
+        if (!star->visited) {
+          ufo->hitCount++;
+        }
+
+        ufo->totalMoveDist += dist;
+        ufo->totalCount++;
+      }
     }
 
     void moveShipFirst(vector<int> &ships) {
