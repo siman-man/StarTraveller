@@ -48,10 +48,6 @@ inline double calcDist(int y1, int x1, int y2, int x2) {
   return sqrt((y2-y1)*(y2-y1) + (x2-x1)*(x2-x1));
 }
 
-inline int calcDistFast(int y1, int x1, int y2, int x2) {
-  return ((y2-y1)*(y2-y1) + (x2-x1)*(x2-x1));
-}
-
 struct Star {
   int y;
   int x;
