@@ -18,7 +18,6 @@ typedef long long ll;
 
 const int SPACE_SIZE = 1024;
 const int MAX_STAR = 2000;
-const int MAX_GALAXY = 16;
 const int MAX_SHIP = 10;
 const int MAX_UFO = 20;
 const ll CYCLE_PER_SEC = 2400000000;
@@ -102,29 +101,14 @@ struct UFO {
   }
 };
 
-struct Galaxy {
-  int y;
-  int x;
-  int gsize;
-  vector<int> stars;
-
-  Galaxy (int y = -1, int x= -1) {
-    this->y = y;
-    this->x = x;
-    this->gsize = 0;
-  }
-};
-
 vector<Star> g_starList;
 Ship g_shipList[MAX_SHIP];
 UFO g_ufoList[MAX_UFO];
-Galaxy g_galaxyList[MAX_GALAXY];
 vector<int> g_path;
 int g_psize;
 
 int g_turn;
 int g_index;
-int g_galaxyCount;
 int g_starCount;
 int g_shipCount;
 int g_ufoCount;
@@ -690,10 +674,6 @@ class StarTraveller {
       }
 
       return ret;
-    }
-
-    Galaxy *getGalaxy(int id) {
-      return &g_galaxyList[id];
     }
 
     Star *getStar(int id) {
