@@ -83,7 +83,6 @@ struct UFO {
   int capacity;
   int crew;
   int sid;
-  int bid;
   int nid;
   int nnid;
   int hitCount;
@@ -389,7 +388,6 @@ class StarTraveller {
       for (int i = 0; i < g_ufoCount; i++) {
         UFO *ufo = getUFO(i);
 
-        ufo->bid = ufo->sid;
         ufo->sid = ufos[i*3];
         ufo->nid = ufos[i*3+1];
         ufo->nnid = ufos[i*3+2];
