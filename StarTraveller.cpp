@@ -66,12 +66,14 @@ struct Star {
 
 struct Ship {
   int sid;
+  int nid;
   int uid;
   bool flag;
   queue<int> path;
 
   Ship () {
     this->sid = -1;
+    this->nid = -1;
     this->uid = -1;
     this->flag = false;
   }
@@ -81,6 +83,7 @@ struct UFO {
   int capacity;
   int crew;
   int sid;
+  int bid;
   int nid;
   int nnid;
   int hitCount;
@@ -135,6 +138,7 @@ int g_remainCount;
 int g_changeLine;
 int g_flagShipId;
 int g_noupdate;
+double g_currentCost;
 bool g_flag;
 bool g_checkFlag;
 
@@ -148,6 +152,7 @@ class StarTraveller {
       g_turn = 0;
       g_index = 0;
       g_timeLimit = g_starCount * 4;
+      g_currentCost = 0.0;
       g_remainCount = g_starCount;
       g_checkFlag = false;
       g_flag = false;
@@ -269,6 +274,7 @@ class StarTraveller {
 
       setParameter();
       updateUFOInfo(ufos);
+      updateShipInfo(ships);
 
       if (!g_flag && g_remainCount > g_timeLimit) {
         g_flag = true;
@@ -325,6 +331,8 @@ class StarTraveller {
       }
 
       vector<int> ret = getOutput();
+      //fprintf(stderr,"current cost = %f\n", g_currentCost);
+
       return ret;
     }
 
@@ -377,10 +385,11 @@ class StarTraveller {
       return update;
     }
 
-    void updateUFOInfo(vector<int> ufos) {
+    void updateUFOInfo(vector<int> &ufos) {
       for (int i = 0; i < g_ufoCount; i++) {
         UFO *ufo = getUFO(i);
 
+        ufo->bid = ufo->sid;
         ufo->sid = ufos[i*3];
         ufo->nid = ufos[i*3+1];
         ufo->nnid = ufos[i*3+2];
@@ -397,10 +406,17 @@ class StarTraveller {
       }
     }
 
-    void moveShipFirst(vector<int> &ships) {
+    void updateShipInfo(vector<int> &ships) {
       for (int i = 0; i < g_shipCount; i++) {
         Ship *ship = getShip(i);
         ship->sid = ships[i];
+      }
+    }
+
+    void moveShipFirst(vector<int> &ships) {
+      for (int i = 0; i < g_shipCount; i++) {
+        Ship *ship = getShip(i);
+        ship->nid = ships[i];
       }
     }
 
@@ -410,7 +426,7 @@ class StarTraveller {
       Star *star = getStar(nid);
 
       if (!star->visited) {
-        flagShip->sid = nid;
+        flagShip->nid = nid;
       }
     }
 
@@ -435,11 +451,11 @@ class StarTraveller {
       }
 
       if (fid == g_flagShipId) {
-        flagShip->sid = nid;
+        flagShip->nid = nid;
       } else {
         changeFlagShip(fid);
         Ship *newFlagShip = getShip(g_flagShipId);
-        newFlagShip->sid = nid;
+        newFlagShip->nid = nid;
       }
     }
 
@@ -474,7 +490,7 @@ class StarTraveller {
           double ndist = DIST_TABLE[ship->sid][ufo->nnid];
 
           if (!star->visited || minDist < ndist) {
-            ship->sid = ufo->nid;
+            ship->nid = ufo->nid;
             ship->uid = j;
             g_ufoList[j].crew++;
           }
@@ -489,9 +505,9 @@ class StarTraveller {
           Star *nstar = getStar(ufo->nid);
 
           if (ship->sid == ufo->sid && ufo->sid == ufo->nnid && nstar->visited) {
-            ship->sid = ufo->sid;
+            ship->nid = ufo->sid;
           } else {
-            ship->sid = ufo->nid;
+            ship->nid = ufo->nid;
           }
         }
       }
@@ -650,7 +666,6 @@ class StarTraveller {
       for (int i = 0; i < g_psize; i++) {
         int s1 = g_path[i];
         int s2 = g_path[(i+1)%g_psize];
-
         double dist = DIST_TABLE[s1][s2];
 
         totalDist += dist;
@@ -664,7 +679,20 @@ class StarTraveller {
 
       for (int i = 0; i < g_shipCount; i++) {
         Ship *ship = getShip(i);
-        ret.push_back(ship->sid);
+        ret.push_back(ship->nid);
+
+        double dist = DIST_TABLE[ship->sid][ship->nid];
+
+        for (int j = 0; j < g_ufoCount; j++) {
+          UFO *ufo = getUFO(j);
+
+          if (ufo->sid == ship->sid && ufo->nid == ship->nid) {
+            dist *= 0.001;
+          }
+        }
+
+        ship->sid = ship->nid;
+        g_currentCost += dist;
       }
 
       return ret;
