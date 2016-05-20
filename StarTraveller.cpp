@@ -230,18 +230,37 @@ class StarTraveller {
           }
         }
 
-        g_path = TSPSolver(firstPath);
-        g_shipList[0].path = g_path;
+        if (g_shipCount == 1) {
+          g_path = TSPSolver(firstPath);
+          g_shipList[0].path = g_path;
+
+          Ship *ship = getShip(0);
+          int size = ship->path.size();
+
+          if (size > 1) {
+            vector<int> npath;
+            double d1 = DIST_TABLE[g_path[size-1]][0];
+            double d2 = DIST_TABLE[0][1];
+
+            if (d1 < d2) {
+              for (int i = size-1; i >= 0; i--) {
+                npath.push_back(ship->path[i]);
+              }
+              ship->path = npath;
+            }
+          }
+
+          cleanPathSingle();
+        } else {
+          MTSPSolver(firstPath);
+          fprintf(stderr,"remain count = %d\n", g_remainCount);
+        }
       }
 
       if (g_turn == 1) {
-          moveShipFirst(ships);
+        moveShipFirst(ships);
       } else if (g_flag) {
-          if (g_shipCount <= 1) {
-            moveShipSingle();
-          } else {
-            moveShip();
-          }
+        moveShip();
       } else {
         moveShipWithUFO();
       }
@@ -333,17 +352,6 @@ class StarTraveller {
       }
     }
 
-    void moveShipSingle() {
-      Ship *flagShip = getShip(g_flagShipId);
-      int nid = flagShip->path[0];
-      flagShip->path.erase(flagShip->path.begin());
-      Star *star = getStar(nid);
-
-      if (!star->visited) {
-        flagShip->nid = nid;
-      }
-    }
-
     void moveShip() {
       for (int i = 0; i < g_shipCount; i++) {
         Ship *ship = getShip(i);
@@ -407,28 +415,26 @@ class StarTraveller {
       }
     }
 
-    vector<int> MTSPSolver(vector<int> &stars) {
-      g_path = stars;
-      g_psize = g_path.size();
-      vector<int> bestPath = g_path;
-      vector<int> goodPath = g_path;
+    void MTSPSolver(vector<int> &stars) {
+      fprintf(stderr,"MTSPSolver =>\n");
+      vector< vector<int> > bestPaths(g_shipCount);
+      bestPaths[0] = stars;
+      g_shipList[0].path = stars;
+      vector<int> goodPath = stars;
       int c1, c2;
       int s1, s2;
 
-      if (g_psize <= 2 || g_shipCount == 1) {
-        return bestPath;
-      }
-
       double bestScore = calcPathDistMulti();
       double goodScore = bestScore;
+
+      double T = 1000.0;
+      double k = 10.0;
+      double alpha = 0.999;
 
       ll startCycle = getCycle();
       double currentTime;
       ll tryCount = 0;
 
-      double T = 1000.0;
-      double k = 10.0;
-      double alpha = 0.999;
       int type;
 
       while(1) {
@@ -442,9 +448,19 @@ class StarTraveller {
           s2 = xor128() % g_shipCount;
         } while (s1 == s2);
 
-        type = xor128()%3;
+        type = xor128()%8;
         Ship *ship1 = getShip(s1);
         Ship *ship2 = getShip(s2);
+        int size1 = ship1->path.size();
+        int size2 = ship2->path.size();
+
+        if (type <= 1 && size1 <= max(c1, c2)) {
+          continue;
+        } else if (type == 2 && size1 == 0) {
+          continue;
+        } else if (type == 8 && size1 <= 2) {
+          continue;
+        }
 
         tryCount++;
 
@@ -453,36 +469,53 @@ class StarTraveller {
             reconnectPath(c1, c2, ship1->path);
             break;
           case 1:
-            swapStar(c1, c2);
+            swapStar(c1, c2, ship1->path);
             break;
           case 2:
-            insertStar(c1, c2);
+            insertStarMulti(s1, s2);
+            break;
+          case 3:
+            swapPath(s1, s2);
+            break;
+          case 4:
+            reversePath(s1);
+            break;
+          case 5:
+            cutPath(s1, s2);
+            break;
+          case 6:
+            cutPathReverse(s1, s2);
+            break;
+          case 7:
+            insertStarMulti2(s1, s2);
+            break;
+          case 8:
+            insertStarMS(ship1->path);
             break;
         }
+
+        /*
+        fprintf(stderr,"tryCount = %lld, type = %d, s1 = %d, s2 = %d, c1 = %d, c2 = %d, size1 = %d, size2 = %d\n",
+            tryCount, type, s1, s2, c1, c2, size1, size2);
+        */
 
         double newScore = calcPathDistMulti();
         double scoreDiff = goodScore - newScore;
 
         if (bestScore > newScore) {
           bestScore = newScore;
-          bestPath = g_path;
+          for (int i = 0; i < g_shipCount; i++) {
+            bestPaths[i] = g_shipList[i].path;
+          }
         }
 
         if (goodScore > newScore) {
           goodScore = newScore;
-        } else if (xor128()%100 < 100*exp(scoreDiff/(k*T))) {
+        } else if (false && xor128()%100 < 100*exp(scoreDiff/(k*T))) {
           goodScore = newScore;
         } else {
-          switch (type) {
-            case 0:
-              reconnectPath(c1, c2, ship1->path);
-              break;
-            case 1:
-              swapStar(c1, c2);
-              break;
-            case 2:
-              g_path = bestPath;
-              break;
+          for (int i = 0; i < g_shipCount; i++) {
+            g_shipList[i].path = bestPaths[i];
           }
         }
 
@@ -497,10 +530,15 @@ class StarTraveller {
         T *= alpha;
       }
 
+      for (int i = 0; i < g_shipCount; i++) {
+        Ship *ship = getShip(i);
+        ship->path = bestPaths[i];
+        showPath(ship->path);
+        fprintf(stderr,"ship %d: path size = %lu\n", i, ship->path.size());
+      }
+
       fprintf(stderr,"tryCount = %lld\n", tryCount);
       fprintf(stderr,"path size = %d, pathDist = %f\n", g_psize, bestScore);
-
-      return bestPath;
     }
 
 
@@ -546,10 +584,10 @@ class StarTraveller {
             reconnectPath(c1, c2, g_path);
             break;
           case 1:
-            swapStar(c1, c2);
+            swapStar(c1, c2, g_path);
             break;
           case 2:
-            insertStar(c1, c2);
+            insertStar(c1, c2, g_path);
             break;
           case 3:
             insertStar2(c1, c2);
@@ -569,20 +607,7 @@ class StarTraveller {
         } else if (xor128()%100 < 100*exp(scoreDiff/(k*T))) {
           goodScore = newScore;
         } else {
-          switch (type) {
-            case 0:
-              reconnectPath(c1, c2, g_path);
-              break;
-            case 1:
-              swapStar(c1, c2);
-              break;
-            case 2:
-              g_path = bestPath;
-              break;
-            case 3:
-              g_path = bestPath;
-              break;
-          }
+          g_path = bestPath;
         }
 
         if (tryCount % 100 == 0) {
@@ -602,37 +627,173 @@ class StarTraveller {
       return bestPath;
     }
 
-    void showPath() {
-      for (int i = 0; i < g_psize-1; i++) {
-        fprintf(stderr," %d ->", g_path[i]);
+    void showPath(vector<int> &path) {
+      int size = path.size();
+      if (size == 0) return;
+      for (int i = 0; i < size-1; i++) {
+        fprintf(stderr," %d ->", path[i]);
       }
-      fprintf(stderr," %d\n", g_path[g_psize-1]);
+      fprintf(stderr," %d\n", path[size-1]);
     }
 
-    void swapStar(int c1, int c2) {
-      int temp = g_path[c1];
-      g_path[c1] = g_path[c2];
-      g_path[c2] = temp;
+    void swapStar(int c1, int c2, vector<int> &path) {
+      int temp = path[c1];
+      path[c1] = path[c2];
+      path[c2] = temp;
     }
 
-    void insertStar(int c1, int c2) {
+    void insertStar(int c1, int c2, vector<int> &path) {
       int temp = g_path[c1];
 
-      g_path.erase(g_path.begin()+c1);
-      g_path.insert(g_path.begin()+c2, temp);
+      path.erase(path.begin()+c1);
+      path.insert(path.begin()+c2, temp);
+    }
+
+    void insertStarMS(vector<int> &path) {
+      int c1, c2;
+      int size = path.size();
+      do {
+        c1 = xor128() % size;
+        c2 = xor128() % size;
+      } while (c1 == c2);
+
+      int temp = path[c1];
+
+      path.erase(path.begin()+c1);
+      path.insert(path.begin()+c2, temp);
     }
 
     void insertStarMulti(int s1, int s2) {
       Ship *ship1 = getShip(s1);
       Ship *ship2 = getShip(s2);
+      int size1 = ship1->path.size();
+      int size2 = ship2->path.size();
 
-      int c1 = xor128() % ship1->path.size();
-      int c2 = xor128() % ship2->path.size();
+      int c1 = (size1 == 0)? 0 : xor128() % size1;
+      int c2 = (size2 == 0)? 0 : xor128() % size2;
 
       int temp = ship1->path[c1];
 
-      ship1->path.erase(g_path.begin()+c1);
-      ship2->path.insert(g_path.begin()+c2, temp);
+      ship1->path.erase(ship1->path.begin()+c1);
+      ship2->path.insert(ship2->path.begin()+c2, temp);
+    }
+
+    void insertStarMulti2(int s1, int s2) {
+      Ship *ship1 = getShip(s1);
+      Ship *ship2 = getShip(s2);
+      int size1 = ship1->path.size();
+      int size2 = ship2->path.size();
+
+      int c1 = (size1 == 0)? 0 : xor128() % size1;
+      int c2 = (size2 == 0)? 0 : xor128() % size2;
+
+      if (c1 > size1-3 || c2 > size2-3) {
+        return;
+      }
+
+      int temp = ship1->path[c1];
+      int temp2 = ship1->path[c1+1];
+
+      ship1->path.erase(ship1->path.begin()+c1);
+      ship1->path.erase(ship1->path.begin()+c1);
+      ship2->path.insert(ship2->path.begin()+c2, temp);
+      ship2->path.insert(ship2->path.begin()+c2, temp2);
+    }
+
+    void swapPath(int s1, int s2) {
+      Ship *ship1 = getShip(s1);
+      Ship *ship2 = getShip(s2);
+
+      vector<int> path = ship1->path;
+      ship1->path = ship2->path;
+      ship2->path = path;
+    }
+
+    void reversePath(int s1) {
+      Ship *ship1 = getShip(s1);
+      reverse(ship1->path.begin(), ship1->path.end());
+    }
+
+    void cutPath(int s1, int s2) {
+      Ship *ship1 = getShip(s1);
+      Ship *ship2 = getShip(s2);
+      int size1 = ship1->path.size();
+
+      vector<int> path = ship1->path;
+      int c1 = (size1 == 0)? 0 : xor128() % size1;
+      ship1->path.clear();
+
+      for (int i = 0; i < size1; i++) {
+        if (i < c1) {
+          ship1->path.push_back(path[i]);
+        } else {
+          ship2->path.push_back(path[i]);
+        }
+      }
+    }
+
+    void cutPathReverse(int s1, int s2) {
+      Ship *ship1 = getShip(s1);
+      Ship *ship2 = getShip(s2);
+      int size1 = ship1->path.size();
+
+      vector<int> path = ship1->path;
+      int c1 = (size1 == 0)? 0 : xor128() % size1;
+      ship1->path.clear();
+
+      for (int i = 0; i < size1; i++) {
+        if (i < c1) {
+          ship1->path.push_back(path[i]);
+        } else {
+          ship2->path.insert(ship2->path.begin(), path[i]);
+        }
+      }
+    }
+
+    void cleanPathSingle() {
+      double minDist = DBL_MAX;
+      int index = -1;
+      Ship *ship = getShip(0);
+      int size = ship->path.size();
+
+      if (size <= 1) return;
+
+      for (int i = 0; i < size; i++) {
+        int sid = ship->path[i];
+        Star *star = getStar(sid);
+
+        double dist = DIST_TABLE[ship->sid][sid];
+        
+        if (minDist > dist) {
+          minDist = dist;
+          index = i;
+        }
+      }
+
+      int bid = (index == 0)? size-1 : index-1;
+      int aid = (index+1)%size;
+
+      double d1 = DIST_TABLE[ship->path[bid]][ship->path[index]];
+      double d2 = DIST_TABLE[ship->path[index]][ship->path[aid]];
+      vector<int> npath;
+
+      if (d1 > d2) {
+        for (int i = 0; i < size; i++) {
+          npath.push_back(ship->path[(index+i)%size]);
+        }
+      } else {
+        for (int i = 0; i < size; i++) {
+          int j = index-i;
+
+          if (j < 0) {
+            npath.push_back(ship->path[size+j]);
+          } else {
+            npath.push_back(ship->path[j]);
+          }
+        }
+      }
+
+      ship->path = npath;
     }
 
     void insertStar2(int c1, int c2) {
