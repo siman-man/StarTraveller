@@ -55,13 +55,11 @@ inline int calcDistFast(int y1, int x1, int y2, int x2) {
 struct Star {
   int y;
   int x;
-  int gid;
   bool visited;
 
   Star (int y = -1, int x = -1) {
     this->y = y;
     this->x = x;
-    this->gid = -1;
     this->visited = false;
   }
 };
