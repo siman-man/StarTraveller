@@ -352,13 +352,11 @@ class StarTraveller {
 
       for (int i = 0; i < g_shipCount; i++) {
         Star *star = getStar(ships[i]);
-
-        if (!star->visited) {
-          update = true;
-          g_remainCount--;
-        }
-
+        if (star->visited) continue;
         star->visited = true;
+
+        update = true;
+        g_remainCount--;
       }
 
       return update;
@@ -442,6 +440,7 @@ class StarTraveller {
 
       for (int j = 0; j < g_ufoCount; j++) {
         UFO *ufo = getUFO(j);
+        Star *nstar = getStar(ufo->nid);
 
         if (ufo->capacity <= ufo->crew) continue; 
 
@@ -450,10 +449,9 @@ class StarTraveller {
 
         for (int i = 0; i < g_shipCount; i++) {
           Ship *ship = getShip(i);
+          double dist = DIST_TABLE[ufo->nid][ship->sid];
 
           if (ship->uid >= 0) continue;
-
-          double dist = DIST_TABLE[ufo->nid][ship->sid];
 
           if (minDist > dist) {
             minDist = dist;
@@ -462,12 +460,11 @@ class StarTraveller {
         }
 
         Ship *ship = getShip(shipId);
-        Star *star = getStar(ufo->nid);
 
         if (minDist <= g_changeLine) {
           double ndist = DIST_TABLE[ship->sid][ufo->nnid];
 
-          if (!star->visited || minDist < ndist) {
+          if (!nstar->visited || minDist < ndist) {
             ship->nid = ufo->nid;
             ship->uid = j;
             g_ufoList[j].crew++;
