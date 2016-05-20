@@ -252,7 +252,8 @@ class StarTraveller {
 
           cleanPathSingle();
         } else {
-          MTSPSolver(firstPath);
+          firstPath = TSPSolver(firstPath, TIME_LIMIT/2);
+          MTSPSolver(firstPath, TIME_LIMIT/2);
           fprintf(stderr,"remain count = %d\n", g_remainCount);
         }
       }
@@ -415,7 +416,7 @@ class StarTraveller {
       }
     }
 
-    void MTSPSolver(vector<int> &stars) {
+    void MTSPSolver(vector<int> &stars, double timeLimit = TIME_LIMIT) {
       fprintf(stderr,"MTSPSolver =>\n");
       vector< vector<int> > bestPaths(g_shipCount);
       bestPaths[0] = stars;
@@ -448,7 +449,7 @@ class StarTraveller {
           s2 = xor128() % g_shipCount;
         } while (s1 == s2);
 
-        type = xor128()%8;
+        type = xor128()%9;
         Ship *ship1 = getShip(s1);
         Ship *ship2 = getShip(s2);
         int size1 = ship1->path.size();
@@ -522,7 +523,7 @@ class StarTraveller {
         if (tryCount % 100 == 0) {
           currentTime = getTime(startCycle);
 
-          if (currentTime > TIME_LIMIT) {
+          if (currentTime > timeLimit) {
             break;
           }
         }
@@ -542,7 +543,7 @@ class StarTraveller {
     }
 
 
-    vector<int> TSPSolver(vector<int> &stars) {
+    vector<int> TSPSolver(vector<int> &stars, double timeLimit = TIME_LIMIT) {
       g_path = stars;
       g_psize = g_path.size();
       vector<int> bestPath = g_path;
@@ -613,7 +614,7 @@ class StarTraveller {
         if (tryCount % 100 == 0) {
           currentTime = getTime(startCycle);
 
-          if (currentTime > TIME_LIMIT) {
+          if (currentTime > timeLimit) {
             break;
           }
         }
