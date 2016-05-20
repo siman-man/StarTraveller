@@ -332,22 +332,16 @@ class StarTraveller {
         directFlagShip();
       }
 
-      for (int i = 0; i < ssize; i++) {
-        Ship *ship = getShip(i);
-
-        if (g_turn == 1) {
-          ship->sid = ships[i];
-        } else if (g_flag) {
+      if (g_turn == 1) {
+          moveShipFirst(ships);
+      } else if (g_flag) {
           if (g_shipCount <= 1) {
             moveShipSingle();
           } else {
             moveShip();
           }
-          break;
-        } else {
-          moveShipWithUFO();
-          break;
-        }
+      } else {
+        moveShipWithUFO();
       }
 
       vector<int> ret = getOutput();
@@ -401,6 +395,13 @@ class StarTraveller {
       }
 
       return update;
+    }
+
+    void moveShipFirst(vector<int> &ships) {
+      for (int i = 0; i < g_shipCount; i++) {
+        Ship *ship = getShip(i);
+        ship->sid = ships[i];
+      }
     }
 
     void moveShipSingle() {
