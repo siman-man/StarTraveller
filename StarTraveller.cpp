@@ -21,8 +21,8 @@ const int MAX_STAR = 2000;
 const int MAX_SHIP = 10;
 const int MAX_UFO = 20;
 const ll CYCLE_PER_SEC = 2400000000;
-double TIME_LIMIT = 15.0;
-double FIRST_TIME_LIMIT = 3.0;
+double TIME_LIMIT = 14.0;
+double FIRST_TIME_LIMIT = 5.0;
 
 double DIST_TABLE[MAX_STAR][MAX_STAR];
 
@@ -439,10 +439,15 @@ class StarTraveller {
       int type;
 
       while(1) {
-        do {
-          c1 = xor128() % g_psize;
-          c2 = xor128() % g_psize;
-        } while (c1 == c2);
+        if (g_psize > 1) {
+          do {
+            c1 = xor128() % g_psize;
+            c2 = xor128() % g_psize;
+          } while (c1 == c2);
+        } else {
+          c1 = 0;
+          c2 = 0;
+        }
 
         do {
           s1 = xor128() % g_shipCount;
@@ -534,7 +539,6 @@ class StarTraveller {
       for (int i = 0; i < g_shipCount; i++) {
         Ship *ship = getShip(i);
         ship->path = bestPaths[i];
-        showPath(ship->path);
         fprintf(stderr,"ship %d: path size = %lu\n", i, ship->path.size());
       }
 
