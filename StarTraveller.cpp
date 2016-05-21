@@ -233,23 +233,6 @@ class StarTraveller {
         if (g_shipCount == 1) {
           g_path = TSPSolver(firstPath);
           g_shipList[0].path = g_path;
-
-          Ship *ship = getShip(0);
-          int size = ship->path.size();
-
-          if (size > 1) {
-            vector<int> npath;
-            double d1 = DIST_TABLE[g_path[size-1]][0];
-            double d2 = DIST_TABLE[0][1];
-
-            if (d1 < d2) {
-              for (int i = size-1; i >= 0; i--) {
-                npath.push_back(ship->path[i]);
-              }
-              ship->path = npath;
-            }
-          }
-
           cleanPathSingle();
         } else {
           firstPath = TSPSolver(firstPath, TIME_LIMIT/2);
