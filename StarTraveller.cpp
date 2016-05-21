@@ -402,8 +402,26 @@ class StarTraveller {
     void MTSPSolver(vector<int> &stars, double timeLimit = TIME_LIMIT) {
       fprintf(stderr,"MTSPSolver =>\n");
       vector< vector<int> > bestPaths(g_shipCount);
-      bestPaths[0] = stars;
-      g_shipList[0].path = stars;
+
+      double minDist = DBL_MAX;
+      int minId = -1;
+      int psize = stars.size();
+
+      for (int i = 0; i < g_shipCount; i++) {
+        Ship *ship = getShip(i);
+
+        for (int j = 0; j < psize; j++) {
+          double dist = DIST_TABLE[ship->sid][stars[j]];
+
+          if (minDist > dist) {
+            minDist = dist;
+            minId = i;
+          }
+        }
+      }
+
+      bestPaths[minId] = stars;
+      g_shipList[minId].path = stars;
       vector<int> goodPath = stars;
       int c1, c2;
       int s1, s2;
