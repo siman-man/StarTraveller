@@ -63,14 +63,12 @@ struct Ship {
   int sid;
   int nid;
   int uid;
-  bool flag;
   vector<int> path;
 
   Ship () {
     this->sid = -1;
     this->nid = -1;
     this->uid = -1;
-    this->flag = false;
   }
 };
 
@@ -115,7 +113,6 @@ int g_ufoCount;
 int g_timeLimit;
 int g_remainCount;
 int g_changeLine;
-int g_flagShipId;
 int g_noupdate;
 double g_currentCost;
 bool g_flag;
@@ -235,8 +232,6 @@ class StarTraveller {
           vector<int> pathB = TSPSolver(secondPath, 2.5);
 
           for (int i = 0; i < 10; i++) {
-            //vector<int> pathA = farthestInsertion(path);
-
             if (i % 2 == 0) {
               MTSPSolver(pathA, 1.2);
             } else {
@@ -698,8 +693,8 @@ class StarTraveller {
       double currentTime;
       ll tryCount = 0;
 
-      double T = 1000.0;
-      double k = 10.0;
+      double T = 10000.0;
+      double k = 1.0;
       double alpha = 0.999;
       int type;
 
