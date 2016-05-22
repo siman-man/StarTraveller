@@ -346,12 +346,10 @@ class StarTraveller {
         for (int k = 0; k < size; k++) {
           int m = path[k];
 
-          assert(!checkList[m]);
           double mmd = DBL_MAX;
 
           for (int j = 0; j < rsize; j++) {
             double dist = DIST_TABLE[m][result[j]];
-            assert(m != result[j]);
 
             if (mmd > dist) {
               mmd = dist;
