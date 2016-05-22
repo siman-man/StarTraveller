@@ -205,7 +205,6 @@ class StarTraveller {
 
         g_path = path;
         g_psize = path.size();
-        //vector<int> firstPath = farthestInsertion(path);
         vector<int> firstPath = nearestNeighbor(path);
         vector<int> secondPath = farthestInsertion(path);
 
@@ -214,7 +213,6 @@ class StarTraveller {
           vector<int> bp, pathA;
 
           for (int i = 0; i < 6; i++) {
-            //vector<int> pathA = farthestInsertion(path);
             if (i % 2 == 0) {
               pathA = TSPSolver(firstPath, TIME_LIMIT/6);
             } else {
@@ -230,25 +228,6 @@ class StarTraveller {
 
           g_shipList[0].path = bp;
           cleanPathSingle(0);
-          /*
-          vector<int> pathA = farthestInsertion(path);
-          pathA = TSPSolver(pathA, TIME_LIMIT/2);
-          g_shipList[0].path = pathA;
-          cleanPathSingle(0);
-          double scoreA = calcPathDist();
-
-          vector<int> pathB = nearestNeighbor(path);
-          pathB = TSPSolver(pathB, TIME_LIMIT/2);
-          g_shipList[0].path = pathB;
-          cleanPathSingle(0);
-          double scoreB = calcPathDist();
-
-          if (scoreA < scoreB) {
-            g_path = pathA;
-            g_shipList[0].path = pathA;
-            cleanPathSingle(0);
-          }
-          */
         } else {
           double minScore = DBL_MAX;
           vector<int> bp;
@@ -274,27 +253,6 @@ class StarTraveller {
           for (int i = 0; i < g_shipCount; i++) {
             g_shipList[i].path = g_tempBestPaths[i];
           }
-
-          /*
-          vector<int> pathA = farthestInsertion(path);
-          pathA = TSPSolver(pathA, TIME_LIMIT/4);
-          MTSPSolver(pathA, TIME_LIMIT/4);
-          double scoreA = calcPathDistMulti();
-          g_tempBestPaths = g_bestPaths;
-
-          vector<int> pathB = nearestNeighbor(path);
-          pathB = TSPSolver(pathB, TIME_LIMIT/4);
-          MTSPSolver(pathB, TIME_LIMIT/4);
-          double scoreB = calcPathDistMulti();
-
-          if (scoreA < scoreB) {
-            g_bestPaths = g_tempBestPaths;
-          }
-          */
-
-          for (int i = 0; i < g_shipCount; i++) {
-            g_shipList[i].path = g_tempBestPaths[i];
-          }
         }
       }
 
@@ -307,7 +265,6 @@ class StarTraveller {
       }
 
       vector<int> ret = getOutput();
-      //fprintf(stderr,"current cost = %f\n", g_currentCost);
 
       return ret;
     }
