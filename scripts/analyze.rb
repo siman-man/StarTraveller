@@ -11,15 +11,18 @@ class Analyze
       @record.puts(TSV_LABEL)
 
       sum_score = 0.0
+      seeds = []
 
       data_list.each do |data|
         data = clean_data(data)
 
+        seeds << data[0]
         puts data[1]
         sum_score += data[1]
         @record.puts(data.join("\t"))
       end
 
+      #p seeds
       puts sum_score
     ensure
       @record&.close
@@ -41,17 +44,24 @@ class Analyze
     data = {}
 
     File.open(filepath, 'r') do |file|
+      check = false
       file.each_line do |line|
         line = clean_line(line)
 
         if line =~ /begin/
           data = {}
+          check = false
         elsif line =~ /!end!/
+        #elsif line =~ /!end!/ && check
           data_list << data.dup
         else
           if validate(line)
             h = line2hash(line)
             data.merge!(h)
+          end
+          if validate2(line)
+            #puts line
+            check ||= true
           end
         end
       end
@@ -70,6 +80,10 @@ class Analyze
 
   def validate(line)
     line =~ /^(score|seed|user)/
+  end
+
+  def validate2(line)
+    line =~ /nship  1 nufo  [1-9]/
   end
 end
 
