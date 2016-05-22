@@ -21,7 +21,8 @@ const int MAX_STAR = 2000;
 const int MAX_SHIP = 10;
 const int MAX_UFO = 20;
 const ll CYCLE_PER_SEC = 2400000000;
-double TIME_LIMIT = 17.0;
+double TIME_LIMIT = 15.0;
+double TIME_SPAN = 1.0;
 double FIRST_TIME_LIMIT = 1.0;
 
 double DIST_TABLE[MAX_STAR][MAX_STAR];
@@ -154,6 +155,7 @@ class StarTraveller {
       for (int i = 0; i < g_starCount-1; i++) {
         Star *from = getStar(i);
 
+        DIST_TABLE[i][i] = 0.0;
         for (int j = i+1; j < g_starCount; j++) {
           Star *to = getStar(j);
           double dist = calcDist(from->y, from->x, to->y, to->x);
@@ -203,11 +205,12 @@ class StarTraveller {
         g_path = path;
         g_psize = path.size();
         vector<int> firstPath = nearestNeighbor(path);
-        vector<int> secondPath = farthestInsertion(path);
+        vector<int> secondPath = selectBestFI(path);
+        //vector<int> secondPath = farthestInsertion(path, 0);
 
         if (g_shipCount == 1) {
           double minScore = DBL_MAX;
-          vector<int> bp, pathA;
+          vector<int> bestPath, pathA;
 
           for (int i = 0; i < 6; i++) {
             if (i % 2 == 0) {
@@ -219,11 +222,11 @@ class StarTraveller {
 
             if (minScore > score) {
               minScore = score;
-              bp = pathA;
+              bestPath = pathA;
             }
           }
 
-          g_shipList[0].path = bp;
+          g_shipList[0].path = bestPath;
           cleanPathSingle(0);
         } else {
           double minScore = DBL_MAX;
@@ -233,9 +236,9 @@ class StarTraveller {
 
           for (int i = 0; i < 10; i++) {
             if (i % 2 == 0) {
-              MTSPSolver(pathA, 1.2);
+              MTSPSolver(pathA, TIME_SPAN);
             } else {
-              MTSPSolver(pathB, 1.2);
+              MTSPSolver(pathB, TIME_SPAN);
             }
             double score = calcPathDistMulti();
 
@@ -293,7 +296,6 @@ class StarTraveller {
         }
 
         double currentTime = getTime(startCycle);
-
         if (currentTime > FIRST_TIME_LIMIT) {
           break;
         }
@@ -302,10 +304,34 @@ class StarTraveller {
       return result;
     }
 
-    vector<int> farthestInsertion(vector<int> path) {
+    vector<int> selectBestFI(vector<int> &path) {
+      g_psize = path.size();
+      double minScore = DBL_MAX;
+      ll startCycle = getCycle();
+      vector<int> bestPath;
+
+      for (int i = 0; i < g_psize; i++) {
+        g_path = farthestInsertion(path, i);
+        double score = calcPathDist();
+
+        if (minScore > score) {
+          bestPath = g_path;
+          minScore = score;
+        }
+
+        double currentTime = getTime(startCycle);
+        if (currentTime > FIRST_TIME_LIMIT) {
+          break;
+        }
+      }
+
+      return bestPath;
+    }
+
+    vector<int> farthestInsertion(vector<int> path, int index) {
       vector<int> result;
-      result.push_back(path[0]);
-      path.erase(path.begin());
+      result.push_back(path[index]);
+      path.erase(path.begin()+index);
 
       int psize = path.size();
       map<int, bool> checkList;
@@ -577,7 +603,21 @@ class StarTraveller {
 
         if (type <= 1 && size1 <= max(c1, c2)) {
           continue;
+        } else if (type == 0 && size1 <= 2) {
+          continue;
+        } else if (type == 1 && size1 <= 1) {
+          continue;
         } else if (type == 2 && size1 == 0) {
+          continue;
+        } else if (type == 3 && size1 == 0 && size2 == 0) {
+          continue;
+        } else if (type == 4 && size1 <= 1) {
+          continue;
+        } else if (type == 5 && size1 == 0) {
+          continue;
+        } else if (type == 6 && size1 == 0) {
+          continue;
+        } else if (type == 7 && size1 <= 1) {
           continue;
         } else if (type == 8 && size1 <= 2) {
           continue;
@@ -652,7 +692,7 @@ class StarTraveller {
           }
         }
 
-        if (tryCount % 100 == 0) {
+        if (tryCount % 10 == 0) {
           currentTime = getTime(startCycle);
 
           if (currentTime > timeLimit) {
@@ -760,7 +800,7 @@ class StarTraveller {
           } 
         }
 
-        if (tryCount % 100 == 0) {
+        if (tryCount % 10 == 0) {
           currentTime = getTime(startCycle);
 
           if (currentTime > timeLimit) {
