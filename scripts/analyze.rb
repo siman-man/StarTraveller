@@ -83,7 +83,7 @@ class Analyze
   end
 
   def validate2(line)
-    line =~ /nship  1 nufo  [1-9]/
+    line =~ /nship  3 nufo  [1-9]/
   end
 end
 
