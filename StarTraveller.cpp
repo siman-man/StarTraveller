@@ -103,13 +103,13 @@ vector<int> g_path;
 int g_psize;
 
 int g_turn;
-int g_index;
 int g_starCount;
 int g_shipCount;
 int g_ufoCount;
 int g_timeLimit;
 int g_remainCount;
 int g_changeLine;
+int g_crewCount;
 double g_currentCost;
 bool g_TSPMode;
 bool g_checkFlag;
@@ -124,7 +124,7 @@ class StarTraveller {
       g_starCount = stars.size()/2;
       used.resize(g_starCount, 0);
       g_turn = 0;
-      g_index = 0;
+      g_crewCount = 0;
       g_timeLimit = g_starCount * 4;
       g_currentCost = 0.0;
       g_remainCount = g_starCount;
@@ -494,6 +494,7 @@ class StarTraveller {
             ship->nid = ufo->nid;
             ship->uid = j;
             g_ufoList[j].crew++;
+            g_crewCount++;
           }
         }
       }
@@ -716,7 +717,7 @@ class StarTraveller {
           c2 = xor128() % g_psize;
         } while (c1 == c2);
 
-        type = xor128()%4;
+        type = xor128()&3;
 
         if (type == 3 && (c1 > g_psize-3 || c2 > g_psize-3)) {
           continue;
