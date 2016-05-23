@@ -169,8 +169,12 @@ class StarTraveller {
     }
 
     void setParameter() {
-      if (g_turn <= g_starCount) {
+      if (g_shipCount <= 3 && g_ufoCount == 1) {
+        g_changeLine = 756;
+      } else if (g_turn <= g_starCount) {
         g_changeLine = 64;
+      } else if (g_turn >= 3*g_starCount) {
+        g_changeLine = 0;
       } else {
         g_changeLine = 256;
       }
@@ -499,7 +503,26 @@ class StarTraveller {
           Ship *ship = getShip(i);
           double dist = DIST_TABLE[ufo->nid][ship->sid];
 
-          if (ship->uid >= 0) continue;
+          if (ship->uid >= 0) {
+            UFO *mfo = getUFO(ship->uid);
+            Star *onstar = getStar(mfo->nid);
+            Star *onnstar = getStar(mfo->nnid);
+
+            if (ship->uid == j) continue;
+            if (ship->sid != ufo->sid) continue;
+            if (!onstar->visited || !onnstar->visited) continue;
+            if (g_turn <= 3*g_starCount) continue;
+
+            if (getAroundStarCount(mfo->nnid) < getAroundStarCount(ufo->nnid)) {
+              ship->uid = j;
+              mfo->crew--;
+              ufo->crew++;
+              break;
+            }
+
+            continue;
+          }
+
           if (ufo->crew == 1 && existAroundStar(ship->sid)) continue;
 
           if (minDist > dist) {
@@ -1046,6 +1069,21 @@ class StarTraveller {
       }
 
       return totalDist;
+    }
+
+    int getAroundStarCount(int sid) {
+      int cnt = 0;
+
+      for (int i = 0; i < g_starCount; i++) {
+        Star *star = getStar(i);
+        if (star->visited) continue;
+
+        if (DIST_TABLE[sid][i] <= 256.0) {
+          cnt++;
+        }
+      }
+
+      return cnt;
     }
 
     bool existAroundStar(int sid) {
