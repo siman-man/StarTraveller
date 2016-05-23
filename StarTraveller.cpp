@@ -82,13 +82,15 @@ struct UFO {
   int hitCount;
   int totalCount;
   double totalMoveDist;
+  bool rideoff;
 
   UFO () {
     this->crew = 0;
-    this->capacity = 1;
+    this->capacity = 10;
     this->hitCount = 0;
     this->totalCount = 0;
     this->totalMoveDist = 0.0;
+    this->rideoff = false;
   }
 
   double hitRate() {
@@ -443,6 +445,7 @@ class StarTraveller {
         ufo->sid = ufos[i*3];
         ufo->nid = ufos[i*3+1];
         ufo->nnid = ufos[i*3+2];
+        ufo->rideoff = false;
         Star *star = getStar(ufo->sid);
 
         double dist = DIST_TABLE[ufo->sid][ufo->nid];
@@ -487,9 +490,9 @@ class StarTraveller {
         UFO *ufo = getUFO(j);
         Star *nstar = getStar(ufo->nid);
 
-        if (ufo->capacity <= ufo->crew) continue; 
+        if (ufo->capacity <= ufo->crew && g_turn <= 3*g_starCount) continue;
 
-        double minDist = DBL_MAX;
+        double minDist = (ufo->crew == 0)? DBL_MAX : 0.1;
         int shipId = -1;
 
         for (int i = 0; i < g_shipCount; i++) {
@@ -497,6 +500,7 @@ class StarTraveller {
           double dist = DIST_TABLE[ufo->nid][ship->sid];
 
           if (ship->uid >= 0) continue;
+          if (ufo->crew == 1 && existAroundStar(ship->sid)) continue;
 
           if (minDist > dist) {
             minDist = dist;
@@ -504,11 +508,12 @@ class StarTraveller {
           }
         }
 
-        if (minDist <= g_changeLine) {
+        if (shipId >= 0 && minDist <= g_changeLine) {
           Ship *ship = getShip(shipId);
           double ndist = DIST_TABLE[ship->sid][ufo->nnid];
 
           if (!nstar->visited || minDist < ndist) {
+            fprintf(stderr,"turn %d: ship %d ride on ufo %d, dist = %f\n", g_turn, shipId, j, minDist);
             ship->nid = ufo->nid;
             ship->uid = j;
             g_ufoList[j].crew++;
@@ -525,6 +530,12 @@ class StarTraveller {
 
           if (ship->sid == ufo->sid && ufo->sid == ufo->nnid && nstar->visited) {
             ship->nid = ufo->sid;
+          } else if (ufo->crew >= 2 && !ufo->rideoff && existAroundStar(ship->sid)) {
+            fprintf(stderr,"turn %d: ship %d ride off ufo %d\n", g_turn, i, ship->uid);
+            ship->uid = -1;
+            ship->nid = ufo->sid;
+            ufo->crew--;
+            ufo->rideoff = true;
           } else {
             ship->nid = ufo->nid;
           }
@@ -1035,6 +1046,19 @@ class StarTraveller {
       }
 
       return totalDist;
+    }
+
+    bool existAroundStar(int sid) {
+      for (int i = 0; i < g_starCount; i++) {
+        Star *star = getStar(i);
+        if (star->visited) continue;
+
+        if (DIST_TABLE[sid][i] <= 40.0) {
+          return true;
+        }
+      }
+
+      return false;
     }
 
     double calcPathDistMulti() {
