@@ -552,6 +552,7 @@ class StarTraveller {
 
       for (int i = 0; i < g_shipCount; i++) {
         bestPaths[i].clear();
+        g_shipList[i].path.clear();
       }
 
       double minDist = DBL_MAX;
