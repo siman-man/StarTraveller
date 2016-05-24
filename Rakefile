@@ -1,7 +1,7 @@
 require 'open3'
 
 FILE_NAME = "StarTraveller"
-SEED = 1037
+SEED = 1006
 
 desc 'c++ file compile'
 task :default do

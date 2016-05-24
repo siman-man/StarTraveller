@@ -651,7 +651,7 @@ class StarTraveller {
           s2 = xor128() % g_shipCount;
         } while (s1 == s2);
 
-        type = xor128()%9;
+        type = xor128()%8;
         Ship *ship1 = getShip(s1);
         Ship *ship2 = getShip(s2);
         int size1 = ship1->path.size();
