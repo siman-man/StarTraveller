@@ -164,9 +164,17 @@ class StarTraveller {
       if (g_shipCount <= 3 && g_ufoCount == 1) {
         g_changeLine = 756;
       } else if (g_turn <= g_starCount) {
-        g_changeLine = 64;
+        if (g_shipCount <= 6) {
+          g_changeLine = 64;
+        } else {
+          g_changeLine = 32;
+        }
       } else if (g_crewCount >= g_shipCount) {
-        g_changeLine = 16;
+        if (g_shipCount <= 6) {
+          g_changeLine = 16;
+        } else {
+          g_changeLine = 0;
+        }
       } else {
         g_changeLine = 256;
       }
