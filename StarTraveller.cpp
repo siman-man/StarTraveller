@@ -579,7 +579,7 @@ class StarTraveller {
 
           if (ship->sid == ufo->sid && ufo->sid == ufo->nnid && nstar->visited) {
             ship->nid = ufo->sid;
-          } else if (ufo->crew >= 2 && !ufo->rideoff && existAroundStar(ship->sid)) {
+          } else if (ufo->crew >= 2 && !ufo->rideoff && existAroundStar(ship->sid) && existAroundShip(ship->sid)) {
             fprintf(stderr,"turn %d: ship %d ride off ufo %d\n", g_turn, i, ship->uid);
             ship->uid = -1;
             ship->nid = ufo->sid;
@@ -665,17 +665,15 @@ class StarTraveller {
           continue;
         } else if (type == 2 && size1 == 0) {
           continue;
-        } else if (type == 3 && size1 == 0 && size2 == 0) {
+        } else if (type == 3 && size1 == 0) {
           continue;
         } else if (type == 4 && size1 <= 1) {
           continue;
         } else if (type == 5 && size1 == 0) {
           continue;
-        } else if (type == 6 && size1 == 0) {
+        } else if (type == 6 && size1 <= 1) {
           continue;
-        } else if (type == 7 && size1 <= 1) {
-          continue;
-        } else if (type == 8 && size1 <= 2) {
+        } else if (type == 7 && size1 <= 2) {
           continue;
         }
 
@@ -690,24 +688,21 @@ class StarTraveller {
             swapStar(c1, c2, ship1->path);
             break;
           case 2:
-            insertStarMulti(s1, s2);
+            insertStarMulti(ship1, ship2);
             break;
           case 3:
-            swapPath(s1, s2);
+            cutPath(ship1, ship2);
             break;
           case 4:
-            reversePath(s1);
+            reversePath(ship1);
             break;
           case 5:
-            cutPath(s1, s2);
+            cutPathReverse(ship1, ship2);
             break;
           case 6:
-            cutPathReverse(s1, s2);
+            insertStarMulti2(ship1, ship2);
             break;
           case 7:
-            insertStarMulti2(s1, s2);
-            break;
-          case 8:
             insertStarMS(ship1->path);
             break;
         }
@@ -757,7 +752,8 @@ class StarTraveller {
         fprintf(stderr,"ship %d: path size = %d\n", i, ps);
       }
 
-      fprintf(stderr,"path size = %d, pathDist = %f\n", g_psize, bestScore + g_currentCost);
+      fprintf(stderr,"tryCount = %lld, path size = %d, pathDist = %f\n",
+          tryCount, g_psize, bestScore + g_currentCost);
 
       return bestPaths;
     }
@@ -890,9 +886,7 @@ class StarTraveller {
       path.insert(path.begin()+c2, temp);
     }
 
-    void insertStarMulti(int s1, int s2) {
-      Ship *ship1 = getShip(s1);
-      Ship *ship2 = getShip(s2);
+    void insertStarMulti(Ship *ship1, Ship *ship2) {
       int size1 = ship1->path.size();
       int size2 = ship2->path.size();
 
@@ -905,9 +899,7 @@ class StarTraveller {
       ship2->path.insert(ship2->path.begin()+c2, temp);
     }
 
-    void insertStarMulti2(int s1, int s2) {
-      Ship *ship1 = getShip(s1);
-      Ship *ship2 = getShip(s2);
+    void insertStarMulti2(Ship *ship1, Ship *ship2) {
       int size1 = ship1->path.size();
       int size2 = ship2->path.size();
 
@@ -927,27 +919,15 @@ class StarTraveller {
       ship2->path.insert(ship2->path.begin()+c2, temp2);
     }
 
-    void swapPath(int s1, int s2) {
-      Ship *ship1 = getShip(s1);
-      Ship *ship2 = getShip(s2);
-
-      vector<int> path = ship1->path;
-      ship1->path = ship2->path;
-      ship2->path = path;
-    }
-
-    void reversePath(int s1) {
-      Ship *ship1 = getShip(s1);
+    void reversePath(Ship *ship1) {
       reverse(ship1->path.begin(), ship1->path.end());
     }
 
-    void cutPath(int s1, int s2) {
-      Ship *ship1 = getShip(s1);
-      Ship *ship2 = getShip(s2);
+    void cutPath(Ship *ship1, Ship *ship2) {
       int size1 = ship1->path.size();
 
       vector<int> path = ship1->path;
-      int c1 = (size1 == 0)? 0 : xor128() % size1;
+      int c1 = xor128() % size1;
       ship1->path.clear();
 
       for (int i = 0; i < size1; i++) {
@@ -959,20 +939,24 @@ class StarTraveller {
       }
     }
 
-    void cutPathReverse(int s1, int s2) {
-      Ship *ship1 = getShip(s1);
-      Ship *ship2 = getShip(s2);
+    void cutPathReverse(Ship *ship1, Ship *ship2) {
       int size1 = ship1->path.size();
+      int size2 = ship2->path.size();
 
       vector<int> path = ship1->path;
       int c1 = (size1 == 0)? 0 : xor128() % size1;
       ship1->path.clear();
+      int type = xor128()%2;
 
       for (int i = 0; i < size1; i++) {
         if (i < c1) {
           ship1->path.push_back(path[i]);
         } else {
-          ship2->path.insert(ship2->path.begin(), path[i]);
+          if (type == 0) {
+            ship2->path.insert(ship2->path.begin()+size2, path[i]);
+          } else {
+            ship2->path.insert(ship2->path.begin(), path[i]);
+          }
         }
       }
     }
@@ -1086,6 +1070,18 @@ class StarTraveller {
       }
 
       return false;
+    }
+
+    bool existAroundShip(int sid) {
+      for (int i = 0; i < g_shipCount; i++) {
+        Ship *ship = getShip(i);
+
+        if (ship->uid < 0 && DIST_TABLE[sid][ship->sid] <= 120) {
+          return false;
+        }
+      }
+
+      return true;
     }
 
     double calcPathDistMulti() {
