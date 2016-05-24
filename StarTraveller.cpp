@@ -166,7 +166,7 @@ class StarTraveller {
       } else if (g_turn <= g_starCount) {
         g_changeLine = 64;
       } else if (g_crewCount >= g_shipCount) {
-        g_changeLine = 32;
+        g_changeLine = 16;
       } else {
         g_changeLine = 256;
       }
@@ -387,8 +387,8 @@ class StarTraveller {
       map<int, bool> checkList;
       vector<int> ret;
       int psize = path.size();
+      int nid = -1;
       int cid = path[index];
-      int nid;
       ret.push_back(cid);
 
       for (int i = 0; i < psize-1; i++) {
@@ -433,7 +433,6 @@ class StarTraveller {
         ufo->nid = ufos[i*3+1];
         ufo->nnid = ufos[i*3+2];
         ufo->rideoff = false;
-        Star *star = getStar(ufo->sid);
 
         double dist = DIST_TABLE[ufo->sid][ufo->nid];
 
@@ -490,7 +489,7 @@ class StarTraveller {
             if (ufo->crew > 0) continue;
             if (g_shipCount >= 3) continue;
             if (ship->uid == j) continue;
-            if (ship->sid != ufo->sid) continue;
+            if (DIST_TABLE[ship->sid][ufo->nid] > 10.0) continue;
             if (!onstar->visited || !onnstar->visited) continue;
             if (g_turn <= g_starCount) continue;
 
@@ -586,7 +585,8 @@ class StarTraveller {
       ll tryCount = 0;
 
       int type;
-      double newScore, subScore;
+      double newScore = 0.0;
+      double subScore = 0.0;
 
       while(1) {
         if (g_psize > 1) {
@@ -706,10 +706,10 @@ class StarTraveller {
       for (int i = 0; i < g_shipCount; i++) {
         Ship *ship = getShip(i);
         ship->path = bestPaths[i];
-        fprintf(stderr,"ship %d: path size = %lu\n", i, ship->path.size());
+        int ps = ship->path.size();
+        fprintf(stderr,"ship %d: path size = %d\n", i, ps);
       }
 
-      fprintf(stderr,"tryCount = %lld\n", tryCount);
       fprintf(stderr,"path size = %d, pathDist = %f\n", g_psize, bestScore + g_currentCost);
 
       return bestPaths;
@@ -812,7 +812,6 @@ class StarTraveller {
         T *= alpha;
       }
 
-      fprintf(stderr,"tryCount = %lld\n", tryCount);
       fprintf(stderr,"path size = %d, pathDist = %f\n", g_psize, bestScore + g_currentCost);
 
       return bestPath;
@@ -941,7 +940,6 @@ class StarTraveller {
 
       for (int i = 0; i < size; i++) {
         int sid = ship->path[i];
-        Star *star = getStar(sid);
 
         double dist = DIST_TABLE[ship->sid][sid];
         
