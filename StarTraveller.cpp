@@ -109,14 +109,13 @@ int g_shipCount;
 int g_ufoCount;
 int g_timeLimit;
 int g_remainCount;
-int g_changeLine;
+int g_rideLine;
 int g_crewCount;
 double g_currentCost;
 bool g_TSPMode;
 bool g_checkFlag;
 bool g_warning;
-ll g_startCycle;
-double g_currentTime;
+double g_totalTime;
 double g_remainTime;
 
 class StarTraveller {
@@ -124,11 +123,12 @@ class StarTraveller {
     vector<int> used;
 
     int init(vector<int> stars) {
-      g_startCycle = getCycle();
+      ll startCycle = getCycle();
 
       g_starCount = stars.size()/2;
       used.resize(g_starCount, 0);
       g_turn = 0;
+      g_totalTime = 0.0;
       g_crewCount = 0;
       g_timeLimit = g_starCount * 4;
       g_currentCost = 0.0;
@@ -148,9 +148,10 @@ class StarTraveller {
 
       setupDistTable();
 
-      g_currentTime = getTime(g_startCycle);
+      double currentTime = getTime(startCycle);
 
-      fprintf(stderr,"setup completed %f\n", g_currentTime);
+      g_totalTime += currentTime;
+      fprintf(stderr,"setup completed %f\n", g_totalTime);
 
       return 0;
     }
@@ -172,25 +173,28 @@ class StarTraveller {
 
     void setParameter() {
       if (g_shipCount <= 3 && g_ufoCount == 1) {
-        g_changeLine = 756;
+        g_rideLine = 756;
       } else if (g_turn <= g_starCount) {
         if (g_shipCount <= 6) {
-          g_changeLine = 64;
+          g_rideLine = 64;
         } else {
-          g_changeLine = 32;
+          g_rideLine = 32;
         }
       } else if (g_crewCount >= g_shipCount) {
         if (g_shipCount <= 6) {
-          g_changeLine = 16;
+          g_rideLine = 16;
         } else {
-          g_changeLine = 0;
+          g_rideLine = 0;
         }
       } else {
-        g_changeLine = 256;
+        g_rideLine = 256;
       }
     } 
 
     vector<int> makeMoves(vector<int> ufos, vector<int> ships) {
+      ll startCycle = getCycle();
+      double currentTime;
+
       g_turn++;
       g_timeLimit--;
 
@@ -217,26 +221,26 @@ class StarTraveller {
         vector<int> path = getUnvisitedStarList();
         g_checkFlag = true;
 
-        g_currentTime = getTime(g_startCycle);
-        fprintf(stderr,"TSP mode %f\n", g_currentTime);
+        currentTime = getTime(startCycle);
+        fprintf(stderr,"TSP mode %f\n", g_totalTime + currentTime);
 
         g_path = path;
         g_psize = path.size();
 
         vector<int> firstPath = nearestNeighbor(path);
-        g_currentTime = getTime(g_startCycle);
-        fprintf(stderr,"nearestNeighbor completed %f\n", g_currentTime);
+        currentTime = getTime(startCycle);
+        fprintf(stderr,"nearestNeighbor completed %f\n", g_totalTime + currentTime);
 
         vector<int> secondPath = selectBestFI(path);
-        g_currentTime = getTime(g_startCycle);
-        fprintf(stderr,"selectBestFI completed %f\n", g_currentTime);
+        currentTime = getTime(startCycle);
+        fprintf(stderr,"selectBestFI completed %f\n", g_totalTime + currentTime);
 
         if (g_shipCount == 1) {
           double minScore = DBL_MAX;
           vector<int> bestPath, pathA;
 
-          g_currentTime = getTime(g_startCycle);
-          g_remainTime = MAX_TIME - g_currentTime;
+          currentTime = getTime(startCycle);
+          g_remainTime = MAX_TIME - (g_totalTime + currentTime);
           fprintf(stderr,"remain time %f\n", g_remainTime);
 
           int retryCount = 6;
@@ -267,8 +271,8 @@ class StarTraveller {
           vector<int> pathA = TSPSolver(firstPath, 2.5);
           vector<int> pathB = TSPSolver(secondPath, 2.5);
 
-          g_currentTime = getTime(g_startCycle);
-          g_remainTime = MAX_TIME - g_currentTime;
+          currentTime = getTime(startCycle);
+          g_remainTime = MAX_TIME - (g_totalTime + currentTime);
           fprintf(stderr,"remain time %f\n", g_remainTime);
           int retryCount = 10;
           double span = (0.9 * g_remainTime) / retryCount;
@@ -293,8 +297,8 @@ class StarTraveller {
             g_shipList[i].path = bestPaths[i];
           }
 
-          g_currentTime = getTime(g_startCycle);
-          fprintf(stderr,"TSP create completed %f\n", g_currentTime);
+          currentTime = getTime(startCycle);
+          fprintf(stderr,"TSP create completed %f\n", g_totalTime + currentTime);
         }
       }
 
@@ -307,6 +311,9 @@ class StarTraveller {
       }
 
       vector<int> ret = getOutput();
+
+      currentTime = getTime(startCycle);
+      g_totalTime += currentTime;
 
       return ret;
     }
@@ -533,7 +540,7 @@ class StarTraveller {
             Star *onnstar = getStar(mfo->nid);
 
             if (ufo->crew > 0) continue;
-            if (g_shipCount >= 3) continue;
+            if (g_shipCount > 3) continue;
             if (ship->uid == j) continue;
             if (DIST_TABLE[ship->sid][ufo->nid] > 10.0) continue;
             if (!onstar->visited || !onnstar->visited) continue;
@@ -556,7 +563,7 @@ class StarTraveller {
           }
         }
 
-        if (shipId >= 0 && minDist <= g_changeLine) {
+        if (shipId >= 0 && minDist <= g_rideLine) {
           Ship *ship = getShip(shipId);
           double ndist = DIST_TABLE[ship->sid][ufo->nnid];
 
@@ -593,7 +600,6 @@ class StarTraveller {
     }
 
     vector< vector<int> > MTSPSolver(vector<int> stars, double timeLimit = TIME_LIMIT) {
-      fprintf(stderr,"MTSPSolver =>\n");
       vector< vector<int> > bestPaths(g_shipCount);
 
       for (int i = 0; i < g_shipCount; i++) {
@@ -748,8 +754,6 @@ class StarTraveller {
       for (int i = 0; i < g_shipCount; i++) {
         Ship *ship = getShip(i);
         ship->path = bestPaths[i];
-        int ps = ship->path.size();
-        fprintf(stderr,"ship %d: path size = %d\n", i, ps);
       }
 
       fprintf(stderr,"tryCount = %lld, path size = %d, pathDist = %f\n",
