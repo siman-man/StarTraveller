@@ -21,9 +21,7 @@ const int MAX_STAR = 2000;
 const int MAX_SHIP = 10;
 const int MAX_UFO = 20;
 const ll CYCLE_PER_SEC = 2400000000;
-double TIME_LIMIT = 15.0;
 double MAX_TIME = 20.0;
-double TIME_SPAN = 1.0;
 double FIRST_TIME_LIMIT = 1.0;
 
 double DIST_TABLE[MAX_STAR][MAX_STAR];
@@ -243,12 +241,12 @@ class StarTraveller {
           g_remainTime = MAX_TIME - (g_totalTime + currentTime);
           fprintf(stderr,"remain time %f\n", g_remainTime);
 
-          int retryCount = 6;
+          int retryCount = 10;
           double span = (0.9 * g_remainTime) / retryCount;
 
           fprintf(stderr,"span time = %f\n" ,span);
 
-          for (int i = 0; i < 6; i++) {
+          for (int i = 0; i < retryCount; i++) {
             if (i % 2 == 0) {
               pathA = TSPSolver(firstPath, span);
             } else {
@@ -274,7 +272,7 @@ class StarTraveller {
           currentTime = getTime(startCycle);
           g_remainTime = MAX_TIME - (g_totalTime + currentTime);
           fprintf(stderr,"remain time %f\n", g_remainTime);
-          int retryCount = 10;
+          int retryCount = 20;
           double span = (0.9 * g_remainTime) / retryCount;
 
           fprintf(stderr,"span time = %f\n" ,span);
@@ -599,7 +597,7 @@ class StarTraveller {
       }
     }
 
-    vector< vector<int> > MTSPSolver(vector<int> stars, double timeLimit = TIME_LIMIT) {
+    vector< vector<int> > MTSPSolver(vector<int> stars, double timeLimit) {
       vector< vector<int> > bestPaths(g_shipCount);
 
       for (int i = 0; i < g_shipCount; i++) {
@@ -762,7 +760,7 @@ class StarTraveller {
       return bestPaths;
     }
 
-    vector<int> TSPSolver(vector<int> stars, double timeLimit = TIME_LIMIT) {
+    vector<int> TSPSolver(vector<int> stars, double timeLimit) {
       g_path = stars;
       g_psize = g_path.size();
       vector<int> bestPath = g_path;
@@ -1158,8 +1156,6 @@ class StarTraveller {
 // -------8<------- end of solution submitted to the website -------8<-------
 template<class T> void getVector(vector<T>& v) { for (int i = 0; i < v.size(); ++i) cin >> v[i];}
 int main() {
-  //TIME_LIMIT = 16.0;
-  //FIRST_TIME_LIMIT = 1.0;
   int NStars; cin >> NStars; vector<int> stars(NStars);
   getVector(stars); StarTraveller algo;
   int ignore = algo.init(stars);
